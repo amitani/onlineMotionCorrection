@@ -189,6 +189,11 @@ MainWindow::MainWindow(QWidget *parent) :
         connect(maxSliders[i],&QSlider::valueChanged,[slider](int value){slider->setMaximum(value);});
     }
 
+    ui->graphicsViewRaw->setHorizontalScrollBarPolicy (Qt::ScrollBarAlwaysOff);
+    ui->graphicsViewRaw->setVerticalScrollBarPolicy  (Qt::ScrollBarAlwaysOff);
+    ui->graphicsViewCorrected->setHorizontalScrollBarPolicy (Qt::ScrollBarAlwaysOff);
+    ui->graphicsViewCorrected->setVerticalScrollBarPolicy  (Qt::ScrollBarAlwaysOff);
+
     mcw=new MotionCorrectionWorker();
     QStringList argv=QCoreApplication::arguments();
     QCommandLineParser parser;
