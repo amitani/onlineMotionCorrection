@@ -301,6 +301,11 @@
       <string>20</string>
      </property>
     </item>
+    <item>
+     <property name="text">
+      <string>50</string>
+     </property>
+    </item>
    </widget>
    <widget class="QLabel" name="labelAverage">
     <property name="geometry">
