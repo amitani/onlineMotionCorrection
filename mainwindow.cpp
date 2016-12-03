@@ -1,15 +1,21 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include <QDebug>
-
+#include <math.h>
 #include <QElapsedTimer>
 
-QImageUpdateWorker::QImageUpdateWorker(QObject* parent):QObject(parent), ch1min_(0),ch1max_(8192),ch2min_(0),ch2max_(8192){
+QImageUpdateWorker::QImageUpdateWorker(QObject* parent):QObject(parent), ch1min_(0),ch1max_(8192),ch2min_(0),ch2max_(8192),n_(1){
 }
 
 QImageUpdateWorker::~QImageUpdateWorker(){
 }
 
+void QImageUpdateWorker::setNumAverage(int n){
+    if(n<=0) return;
+    if(n>=200) return;
+    n_=n;
+    return;
+}
 
 void QImageUpdateWorker::setLimits(int ch, int type, int value){
     qDebug()<<"QIUW::setLimits::" << ch << ", " << type << ", " << value;
@@ -27,15 +33,10 @@ void QImageUpdateWorker::setLimits(int ch, int type, int value){
         else  ch3min_=value;
         break;
     }
+    show();
 }
 
 void QImageUpdateWorker::processed(std::vector<cv::Mat> raw, std::vector<cv::Mat> shifted){
-    struct remap_to_uint8_c{
-        unsigned int operator()(double x, double min, double max){
-            return cv::saturate_cast<unsigned char>(256.0*(x-min)/(max-min));
-        }
-    } remap_to_uint8;
-
     qDebug()<<"QIUW::";
     if(raw.empty()) return;
 /*    qDebug() << raw.size();
@@ -62,36 +63,91 @@ void QImageUpdateWorker::processed(std::vector<cv::Mat> raw, std::vector<cv::Mat
         }
     }
 
+    if(deque_raw.size()>0){
+        if(deque_raw[0].size()!=raw.size()){
+            qDebug()<<"QIUW::size discrepancy (ch), clearing deque";
+            deque_raw.clear();
+            deque_shifted.clear();
+        }else if(deque_raw[0][0].cols!=raw[0].cols){
+            qDebug()<<"QIUW::size discrepancy (cols), clearing deque";
+            deque_raw.clear();
+            deque_shifted.clear();
+        }else if(deque_raw[0][0].rows!=raw[0].rows){
+            qDebug()<<"QIUW::size discrepancy (rows), clearing deque";
+            deque_raw.clear();
+            deque_shifted.clear();
+        }
+    }
+
     QElapsedTimer et;
     et.start();
 
+    deque_raw.push_front(raw);
+    while(deque_raw.size()>N_DEQUE)deque_raw.pop_back();
+    deque_shifted.push_front(shifted);
+    while(deque_shifted.size()>N_DEQUE)deque_shifted.pop_back();
 
-    QImage qimg_raw(raw[0].cols,raw[0].rows,QImage::Format_RGB32);
-    for(int y=0;y<raw[0].rows;y++){
-        for(int x=0;x<raw[0].cols;x++){
-            if(raw.size()>1)
+    show();
+}
+
+void QImageUpdateWorker::show(){
+    QElapsedTimer et;
+    et.start();
+
+    struct remap_to_uint8_c{
+        unsigned int operator()(double x, double min, double max){
+            return cv::saturate_cast<unsigned char>(256.0*(x-min)/(max-min));
+        }
+    } remap_to_uint8;
+
+    if(deque_raw.empty()){
+        qDebug()<<"QIUW::deque empty";
+        return;
+    }
+    int n=std::min(n_,(int)deque_raw.size());
+    qDebug()<<"QIUW::averaging " << n_ << ", " << deque_raw.size() << ", " << N_DEQUE;
+    qDebug()<<"QIUW::averaging " << n << " frames";
+
+    std::vector<cv::Mat>raw_average(deque_raw[0].size(),cv::Mat(deque_raw[0][0].rows,deque_raw[0][0].cols,CV_32F));
+    for(int ch=0;ch<deque_raw[0].size();ch++){
+        for(int i=0;i<n;i++) raw_average[ch]+=deque_raw[i][ch];
+        raw_average[ch]/=(float)n;
+        //raw_average[ch]=deque_raw[0][ch];
+    }
+
+    QImage qimg_raw(raw_average[0].cols,raw_average[0].rows,QImage::Format_RGB32);
+    for(int y=0;y<raw_average[0].rows;y++){
+        for(int x=0;x<raw_average[0].cols;x++){
+            if(raw_average.size()>1)
                 qimg_raw.setPixel(y,x,
-                   qRgb(remap_to_uint8(raw[1].at<int16_t>(y,x),ch2min_,ch2max_),
-                                  remap_to_uint8(raw[0].at<int16_t>(y,x),ch1min_,ch1max_),0));
+                   qRgb(remap_to_uint8(raw_average[1].at<float>(y,x),ch2min_,ch2max_),
+                                  remap_to_uint8(raw_average[0].at<float>(y,x),ch1min_,ch1max_),0));
             else
                 qimg_raw.setPixel(y,x,
-                   qRgb(0,remap_to_uint8(raw[0].at<int16_t>(y,x),ch2min_,ch2max_),0));
+                   qRgb(0,remap_to_uint8(raw_average[0].at<float>(y,x),ch2min_,ch2max_),0));
         }
     }
     qDebug()<<"QIUW::raw:"<<et.elapsed();
     //qimg_raw=qimg_raw.mirrored(true,true);
     //qDebug()<<et.elapsed();
 
-    QImage qimg_shifted(shifted[0].cols,shifted[0].rows,QImage::Format_RGB32);
-    for(int y=0;y<raw[0].rows;y++){
-        for(int x=0;x<raw[0].cols;x++){
-            if(raw.size()>1)
+    std::vector<cv::Mat>shifted_average(deque_shifted[0].size(),cv::Mat(deque_shifted[0][0].rows,deque_shifted[0][0].cols,CV_32F));
+    for(int ch=0;ch<deque_shifted[0].size();ch++){
+        for(int i=0;i<n;i++)shifted_average[ch]+=deque_shifted[i][ch];
+        shifted_average[ch]/=(float)n;
+        //shifted_average[ch]=deque_shifted[0][ch];
+
+    }
+    QImage qimg_shifted(shifted_average[0].cols,shifted_average[0].rows,QImage::Format_RGB32);
+    for(int y=0;y<shifted_average[0].rows;y++){
+        for(int x=0;x<shifted_average[0].cols;x++){
+            if(shifted_average.size()>1)
                 qimg_shifted.setPixel(y,x,
-                   qRgb(remap_to_uint8(shifted[1].at<float>(y,x),ch2min_,ch2max_),
-                                      remap_to_uint8(shifted[0].at<float>(y,x),ch1min_,ch1max_),0));
+                   qRgb(remap_to_uint8(shifted_average[1].at<float>(y,x),ch2min_,ch2max_),
+                                      remap_to_uint8(shifted_average[0].at<float>(y,x),ch1min_,ch1max_),0));
             else
                 qimg_shifted.setPixel(y,x,
-                   qRgb(0,remap_to_uint8(shifted[0].at<float>(y,x),ch2min_,ch2max_),0));
+                   qRgb(0,remap_to_uint8(shifted_average[0].at<float>(y,x),ch2min_,ch2max_),0));
         }
     }
     //qDebug()<<et.elapsed();
@@ -189,7 +245,7 @@ MainWindow::MainWindow(QWidget *parent) :
     qRegisterMetaType<std::vector<cv::Mat>>();
     connect(mcw,SIGNAL(processed(std::vector<cv::Mat>,std::vector<cv::Mat>)),qiuw,SLOT(processed(std::vector<cv::Mat>,std::vector<cv::Mat>)));
     connect(qiuw,SIGNAL(updated(QImage,QImage)),this,SLOT(updated(QImage,QImage)));
-
+    connect(ui->comboBoxAverage,&QComboBox::currentTextChanged,[qiuw_](QString value){qiuw_->setNumAverage(value.toInt());});
 
     motion_correction_thread->start();
     qimage_update_thread->start();

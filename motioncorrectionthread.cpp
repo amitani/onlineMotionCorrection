@@ -46,8 +46,10 @@ void MotionCorrectionWorker::check(){
                 if(temporary_data->data[i]<80)temporary_data->data[i]=35;
             }
             for(int i=0;i<temporary_data->n_ch;i++){
-                raw_frame.push_back(cv::Mat(temporary_data->height,temporary_data->width,CV_16SC1,
-                                            temporary_data->data+temporary_data->height*temporary_data->width*i).clone());
+                cv::Mat tmp;
+                cv::Mat(temporary_data->height,temporary_data->width,CV_16S,
+                        temporary_data->data+temporary_data->height*temporary_data->width*i).convertTo(tmp,CV_32F);
+                raw_frame.push_back(tmp);
             }
 
             qDebug()<<"MCW::"<<et.elapsed()<<":copied";

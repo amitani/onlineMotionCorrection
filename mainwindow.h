@@ -8,6 +8,7 @@
 #include <QCommandLineParser>
 #include <QThread>
 #include <vector>
+#include <deque>
 #include <motioncorrectionthread.h>
 
 #include <QImage>
@@ -23,12 +24,18 @@ public:
 public slots:
     void processed(std::vector<cv::Mat> raw, std::vector<cv::Mat> corrected);
     void setLimits(int ch, int type, int value);
+    void setNumAverage(int n);
+    void show();
 
 signals:
     void updated(QImage raw, QImage corrected);
 
 private:
+    std::deque<std::vector<cv::Mat>> deque_raw, deque_shifted;
     int ch1min_, ch1max_, ch2min_, ch2max_, ch3min_, ch3max_;
+    int n_;
+
+    static const unsigned int N_DEQUE = 256;
 };
 
 
