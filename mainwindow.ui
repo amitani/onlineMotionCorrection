@@ -243,6 +243,9 @@
     <property name="text">
      <string>Show</string>
     </property>
+    <property name="checked">
+     <bool>true</bool>
+    </property>
    </widget>
    <widget class="QCheckBox" name="checkBoxCh2">
     <property name="geometry">
@@ -256,6 +259,9 @@
     <property name="text">
      <string>Show</string>
     </property>
+    <property name="checked">
+     <bool>true</bool>
+    </property>
    </widget>
    <widget class="QCheckBox" name="checkBoxCh3">
     <property name="geometry">
@@ -268,6 +274,9 @@
     </property>
     <property name="text">
      <string>Show</string>
+    </property>
+    <property name="checked">
+     <bool>true</bool>
     </property>
    </widget>
    <widget class="QComboBox" name="comboBoxAverage">

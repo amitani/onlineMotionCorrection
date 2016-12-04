@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include <QSlider>
 #include <QSpinBox>
+#include <QCheckBox>
 #include <QTimer>
 #include <QCommandLineParser>
 #include <QThread>
@@ -32,7 +33,7 @@ signals:
 
 private:
     std::deque<std::vector<cv::Mat>> deque_raw, deque_shifted;
-    int ch1min_, ch1max_, ch2min_, ch2max_, ch3min_, ch3max_;
+    std::vector<std::vector<int>> channel_parameters; //channel_parameters[ch][type] type:0:min, 1:max, 2:enabled
     int n_;
 
     static const unsigned int N_DEQUE = 256;
@@ -63,6 +64,7 @@ private:
     std::vector<QSlider*> maxSliders;
     std::vector<QSpinBox*> minSpinBoxes;
     std::vector<QSpinBox*> maxSpinBoxes;
+    std::vector<QCheckBox*> checkBoxes;
 
     QThread* motion_correction_thread;
     QThread* qimage_update_thread;

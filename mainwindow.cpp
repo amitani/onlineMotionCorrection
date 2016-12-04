@@ -4,7 +4,13 @@
 #include <math.h>
 #include <QElapsedTimer>
 
-QImageUpdateWorker::QImageUpdateWorker(QObject* parent):QObject(parent), ch1min_(0),ch1max_(8192),ch2min_(0),ch2max_(8192),n_(1){
+QImageUpdateWorker::QImageUpdateWorker(QObject* parent):QObject(parent),n_(1){
+    channel_parameters.resize(3);
+    for(auto&& ch:channel_parameters){
+        ch.push_back(0);
+        ch.push_back(8192);
+        ch.push_back(1);
+    }
 }
 
 QImageUpdateWorker::~QImageUpdateWorker(){
@@ -18,22 +24,16 @@ void QImageUpdateWorker::setNumAverage(int n){
 }
 
 void QImageUpdateWorker::setLimits(int ch, int type, int value){
-    qDebug()<<"QIUW::setLimits::" << ch << ", " << type << ", " << value;
-    switch(ch){
-    case 0:
-        if(type) ch1max_=value;
-        else  ch1min_=value;
-        break;
-    case 1:
-        if(type) ch2max_=value;
-        else  ch2min_=value;
-        break;
-    case 2:
-        if(type) ch3max_=value;
-        else  ch3min_=value;
-        break;
-    }
+    qDebug()<<"QIUW::setLimits::setting " << ch << ", " << type << ", " << value;
+    if(ch<0) return;
+    if(ch>2) return;
+    if(type<0) return;
+    if(type>2) return;
+
+    channel_parameters[ch][type]=value;
+    qDebug()<<"QIUW::setLimits::set " << ch << ", " << type << ", " << value;
     show();
+    qDebug()<<"QIUW::setLimits::shown " << ch << ", " << type << ", " << value;
 }
 
 void QImageUpdateWorker::processed(std::vector<cv::Mat> raw, std::vector<cv::Mat> shifted){
@@ -95,8 +95,8 @@ void QImageUpdateWorker::show(){
     et.start();
 
     struct remap_to_uint8_c{
-        unsigned int operator()(double x, double min, double max){
-            return cv::saturate_cast<unsigned char>(256.0*(x-min)/(max-min));
+        unsigned int operator()(double x, std::vector<int> params){
+            return params.size()>2&&params[2]?cv::saturate_cast<unsigned char>(256.0*(x-params[0])/(params[1]-params[0])):0;
         }
     } remap_to_uint8;
 
@@ -120,11 +120,11 @@ void QImageUpdateWorker::show(){
         for(int x=0;x<raw_average[0].cols;x++){
             if(raw_average.size()>1)
                 qimg_raw.setPixel(y,x,
-                   qRgb(remap_to_uint8(raw_average[1].at<float>(y,x),ch2min_,ch2max_),
-                                  remap_to_uint8(raw_average[0].at<float>(y,x),ch1min_,ch1max_),0));
+                   qRgb(remap_to_uint8(raw_average[1].at<float>(y,x),channel_parameters[1]),
+                                  remap_to_uint8(raw_average[0].at<float>(y,x),channel_parameters[0]),0));
             else
                 qimg_raw.setPixel(y,x,
-                   qRgb(0,remap_to_uint8(raw_average[0].at<float>(y,x),ch2min_,ch2max_),0));
+                   qRgb(0,remap_to_uint8(raw_average[0].at<float>(y,x),channel_parameters[1]),0));
         }
     }
     qDebug()<<"QIUW::raw:"<<et.elapsed();
@@ -143,11 +143,11 @@ void QImageUpdateWorker::show(){
         for(int x=0;x<shifted_average[0].cols;x++){
             if(shifted_average.size()>1)
                 qimg_shifted.setPixel(y,x,
-                   qRgb(remap_to_uint8(shifted_average[1].at<float>(y,x),ch2min_,ch2max_),
-                                      remap_to_uint8(shifted_average[0].at<float>(y,x),ch1min_,ch1max_),0));
+                   qRgb(remap_to_uint8(shifted_average[1].at<float>(y,x),channel_parameters[1]),
+                                      remap_to_uint8(shifted_average[0].at<float>(y,x),channel_parameters[0]),0));
             else
                 qimg_shifted.setPixel(y,x,
-                   qRgb(0,remap_to_uint8(shifted_average[0].at<float>(y,x),ch2min_,ch2max_),0));
+                   qRgb(0,remap_to_uint8(shifted_average[0].at<float>(y,x),channel_parameters[1]),0));
         }
     }
     //qDebug()<<et.elapsed();
@@ -189,10 +189,14 @@ MainWindow::MainWindow(QWidget *parent) :
         connect(maxSliders[i],&QSlider::valueChanged,[slider](int value){slider->setMaximum(value);});
     }
 
-    ui->graphicsViewRaw->setHorizontalScrollBarPolicy (Qt::ScrollBarAlwaysOff);
-    ui->graphicsViewRaw->setVerticalScrollBarPolicy  (Qt::ScrollBarAlwaysOff);
-    ui->graphicsViewCorrected->setHorizontalScrollBarPolicy (Qt::ScrollBarAlwaysOff);
-    ui->graphicsViewCorrected->setVerticalScrollBarPolicy  (Qt::ScrollBarAlwaysOff);
+    checkBoxes.push_back(ui->checkBoxCh1);
+    checkBoxes.push_back(ui->checkBoxCh2);
+    checkBoxes.push_back(ui->checkBoxCh3);
+
+    ui->graphicsViewRaw->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    ui->graphicsViewRaw->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    ui->graphicsViewCorrected->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    ui->graphicsViewCorrected->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
     mcw=new MotionCorrectionWorker();
     QStringList argv=QCoreApplication::arguments();
@@ -241,6 +245,7 @@ MainWindow::MainWindow(QWidget *parent) :
     for(int ch=0;ch<3;ch++){
         connect(minSliders[ch],&QSlider::valueChanged,[qiuw_, ch](int value){qiuw_->setLimits(ch,0,value);});
         connect(maxSliders[ch],&QSlider::valueChanged,[qiuw_, ch](int value){qiuw_->setLimits(ch,1,value);});
+        connect(checkBoxes[ch],&QCheckBox::stateChanged, [qiuw_, ch](int value){qiuw_->setLimits(ch,2,value);});
     }
     qiuw->moveToThread(qimage_update_thread);
     connect(qimage_update_thread, SIGNAL(started()), qiuw, SLOT(start()));
