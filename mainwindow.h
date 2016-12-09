@@ -19,11 +19,10 @@ class QImageUpdateWorker:public QObject
     Q_DISABLE_COPY(QImageUpdateWorker)
 
 public:
-    explicit QImageUpdateWorker(QObject* parent = 0);
+    explicit QImageUpdateWorker(QObject* parent = 0, MotionCorrectionWorker* mcw=NULL);
     ~QImageUpdateWorker();
 
 public slots:
-    void processed(std::vector<cv::Mat> raw, std::vector<cv::Mat> corrected);
     void setLimits(int ch, int type, int value);
     void setNumAverage(int n);
     void show();
@@ -32,9 +31,11 @@ signals:
     void updated(QImage raw, QImage corrected);
 
 private:
-    std::deque<std::vector<cv::Mat>> deque_raw, deque_shifted;
+    //std::deque<std::vector<cv::Mat>> deque_raw, deque_shifted;
+    MotionCorrectionWorker* mcw_;
     std::vector<std::vector<int>> channel_parameters; //channel_parameters[ch][type] type:0:min, 1:max, 2:enabled
     int n_;
+    int last_frame_tag;
 
     static const unsigned int N_DEQUE = 256;
 };

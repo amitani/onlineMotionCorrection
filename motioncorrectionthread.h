@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QTimer>
 #include <QMetaObject>
+#include <QMutex>
 #include <vector>
 #include <memory>
 #include "mmap.h"
@@ -30,9 +31,10 @@ public:
     void setCh(int ch);
     void initImageRegistrator();
     void loadParameters(QString xmlfilename);
+    void getDeque(std::deque<std::vector<cv::Mat>> &deque_raw, std::deque<std::vector<cv::Mat>> &deque_shifted, std::deque<int> &deque_frame_tag);
 
 signals:
-    void processed(std::vector<cv::Mat> raw, std::vector<cv::Mat> corrected);
+    void processed();
 
 private:
     QTimer* timer;
@@ -42,6 +44,13 @@ private:
     int ch;
     std::shared_ptr<ImageRegistrator> ir;
     std::shared_ptr<SI4Image> temporary_data;
+
+    static const int max_deque_size = 200;
+
+    std::deque<std::vector<cv::Mat>> deque_raw_;
+    std::deque<std::vector<cv::Mat>> deque_shifted_;
+    std::deque<int> deque_frame_tag_;
+    QMutex mutex_;
 
     //cv::Mat shift(SI4Image* source, double i0, double j0);
 };
