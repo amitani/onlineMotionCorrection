@@ -99,20 +99,25 @@ void MotionCorrectionWorker::check(){
                     qDebug()<<"QIUW::size discrepancy (ch), clearing deque";
                     deque_raw_.clear();
                     deque_shifted_.clear();
+                    deque_frame_tag_.clear();
                 }else if(deque_raw_[0][0].cols!=raw_frame[0].cols){
                     qDebug()<<"QIUW::size discrepancy (cols), clearing deque";
                     deque_raw_.clear();
                     deque_shifted_.clear();
+                    deque_frame_tag_.clear();
                 }else if(deque_raw_[0][0].rows!=raw_frame[0].rows){
                     qDebug()<<"QIUW::size discrepancy (rows), clearing deque";
                     deque_raw_.clear();
                     deque_shifted_.clear();
+                    deque_frame_tag_.clear();
                 }
             }
             deque_raw_.push_front(raw_frame);
             while(deque_raw_.size()>max_deque_size)deque_raw_.pop_back();
             deque_shifted_.push_front(shifted_frame);
             while(deque_shifted_.size()>max_deque_size)deque_shifted_.pop_back();
+            deque_frame_tag_.push_front(last_frame_tag);
+            while(deque_frame_tag_.size()>max_deque_size)deque_frame_tag_.pop_back();
             mutex_.unlock();
             emit processed();
 
@@ -124,10 +129,11 @@ void MotionCorrectionWorker::check(){
         qDebug()<<"MCW::no IR";
     }
 }
-void MotionCorrectionWorker::getDeque(std::deque<std::vector<cv::Mat>> &deque_raw, std::deque<std::vector<cv::Mat>> &deque_shifted){
+void MotionCorrectionWorker::getDeque(std::deque<std::vector<cv::Mat>> &deque_raw, std::deque<std::vector<cv::Mat>> &deque_shifted, std::deque<int> &deque_frame_tag){
     mutex_.lock();
     deque_raw=deque_raw_;
     deque_shifted=deque_shifted_;
+    deque_frame_tag=deque_frame_tag_;
     mutex_.unlock();
 }
 

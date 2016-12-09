@@ -43,13 +43,16 @@ void QImageUpdateWorker::show(){
     qDebug()<<"QIUW::";
     std::deque<std::vector<cv::Mat>> deque_raw;
     std::deque<std::vector<cv::Mat>> deque_shifted;
-    mcw_->getDeque(deque_raw,deque_shifted);
+    std::deque<int> deque_frame_tag;
+    mcw_->getDeque(deque_raw,deque_shifted,deque_frame_tag);
 
-    if(deque_raw.empty() || deque_shifted.empty()) return;
+    if(deque_raw.empty() || deque_shifted.empty()||deque_frame_tag.empty()) return;
+
+    if(last_frame_tag == deque_frame_tag[0]) return;
+    else last_frame_tag = deque_frame_tag[0];
 
     std::vector<cv::Mat> raw = deque_raw[0];
     std::vector<cv::Mat> shifted = deque_shifted[0];
-
 
     struct remap_to_uint8_c{
         unsigned int operator()(double x, std::vector<int> params){

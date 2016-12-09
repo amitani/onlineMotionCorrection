@@ -31,7 +31,7 @@ public:
     void setCh(int ch);
     void initImageRegistrator();
     void loadParameters(QString xmlfilename);
-    void getDeque(std::deque<std::vector<cv::Mat>>& deque_raw, std::deque<std::vector<cv::Mat>>& deque_shifted);
+    void getDeque(std::deque<std::vector<cv::Mat>> &deque_raw, std::deque<std::vector<cv::Mat>> &deque_shifted, std::deque<int> &deque_frame_tag);
 
 signals:
     void processed();
@@ -49,6 +49,7 @@ private:
 
     std::deque<std::vector<cv::Mat>> deque_raw_;
     std::deque<std::vector<cv::Mat>> deque_shifted_;
+    std::deque<int> deque_frame_tag_;
     QMutex mutex_;
 
     //cv::Mat shift(SI4Image* source, double i0, double j0);
