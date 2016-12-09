@@ -176,20 +176,22 @@ MainWindow::MainWindow(QWidget *parent) :
         if(args.size()>1){
             qDebug()<<"too many arguments";
             exit(1);
-        }else if(args.size()==0){
-            qDebug()<<"too few arguments";
-            exit(1);
         }else{
-            qDebug()<<args[0];
-            mcw->setTemplate(args[0]);
             if(parser.isSet(chOpt)){
                 QString chStr=parser.value(chOpt);
                 qDebug()<<chStr;
                 mcw->setCh(chStr.toInt());
             }
+            if(args.size()==0){
+                qDebug()<<"using moving average as template";
+                ui->labelTiff->setText("Moving average");
+            }else{
+                qDebug()<<args[0];
+                mcw->setTemplate(args[0]);
+                ui->labelTiff->setText(args[0]);
+            }
             qDebug()<<"Init";
             mcw->initImageRegistrator();
-            //mcw->loadParameters();
         }
     }
     qDebug()<<"Starting thread";
@@ -208,7 +210,6 @@ MainWindow::MainWindow(QWidget *parent) :
         connect(checkBoxes[ch],&QCheckBox::stateChanged, [qiuw_, ch](int value){qiuw_->setLimits(ch,2,value);});
     }
     qiuw->moveToThread(qimage_update_thread);
-    connect(qimage_update_thread, SIGNAL(started()), qiuw, SLOT(start()));
     connect(qimage_update_thread, SIGNAL(finished()), qiuw, SLOT(deleteLater()));
     connect(qimage_update_thread, SIGNAL(finished()), qimage_update_thread, SLOT(deleteLater()));
 

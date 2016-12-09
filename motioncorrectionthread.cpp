@@ -6,7 +6,7 @@
 #include "CImg.h"
 using namespace cimg_library;
 
-MotionCorrectionWorker::MotionCorrectionWorker(QObject* parent):QObject(parent)
+MotionCorrectionWorker::MotionCorrectionWorker(QObject* parent):QObject(parent), n_template(default_n_template)
 {
     timer = new QTimer(this);
     timer->setInterval(5);
@@ -51,16 +51,35 @@ void MotionCorrectionWorker::check(){
                         temporary_data->data+temporary_data->height*temporary_data->width*i).convertTo(tmp,CV_32F);
                 raw_frame.push_back(tmp);
             }
-
             qDebug()<<"MCW::"<<et.elapsed()<<":copied";
+
             int ch_to_align= ch && ch<temporary_data->n_ch?ch:temporary_data->n_ch-1;
-            cv::Point2d d;
             qDebug()<<"MCW::ch "<<ch_to_align;
-
-            //ir->Align(raw_frame[ch_to_align],NULL,&d);
-
+            cv::Point2d d;
             cv::Mat heatmap;
-            ir->Align(raw_frame[ch_to_align],NULL,&d,&heatmap);
+            if(template_image.empty()){
+                mutex_.lock();
+                auto deque_raw = deque_raw_;
+                mutex_.unlock();
+
+                qDebug()<<"MCW::deque_size:"<<deque_raw.size();
+                if(!deque_raw.empty() && temporary_data->n_ch == deque_raw[0].size()){
+                    qDebug()<<"MCW::averaging for template";
+                    cv::Mat tmp(deque_raw[0][ch_to_align].rows,deque_raw[0][ch_to_align].cols,CV_32F);
+                    int n=deque_raw.size()>n_template?n_template:deque_raw.size();
+                    qDebug()<<"MCW::averaging frames:" << n;
+                    for(int i=0;i<n;i++) tmp+=deque_raw[i][ch_to_align];
+                    tmp/=(float)n;
+                    qDebug()<<"MCW::averaged for template";
+                    ir->SetTemplate(tmp);
+                    ir->Init();
+                    ir->Align(raw_frame[ch_to_align],NULL,&d,&heatmap);
+                    qDebug()<<"MCW::aligned to average";
+                }
+            }else{
+                ir->Align(raw_frame[ch_to_align],NULL,&d,&heatmap);
+                qDebug()<<"MCW::aligned";
+            }
 
             /*cv::Mat tmp=raw_frame[ch_to_align];
             for(int y=0;y<tmp.rows;y++){
@@ -71,9 +90,8 @@ void MotionCorrectionWorker::check(){
             exit(1);*/
 
 
-
             qDebug()<<"MCW::"<<heatmap.size[0]<<heatmap.size[1];
-            qDebug()<<"MCW::corr="<<heatmap.at<float>(33,33);
+            if(heatmap.size[0]>40 && heatmap.size[1]>40) qDebug()<<"MCW::corr="<<heatmap.at<float>(33,33);
 //          emit processed(std::vector<cv::Mat>(1,heatmap),std::vector<cv::Mat>(1,heatmap));
 //          return;
 
@@ -151,21 +169,6 @@ void MotionCorrectionWorker::setTemplate(QString tifffilename){
 
         template_image.push_back(tmp.clone());
     }
-
-
-    /*qDebug()<<"loaded template";
-    qDebug()<<template_image.size();
-    qDebug()<<template_image[0].rows<<template_image[0].cols;
-
-    for(int ch=0;ch<template_image.size();ch++){
-        cv::Mat tmp=template_image[ch];
-        for(int y=0;y<tmp.rows;y++){
-            for(int x=0;x<tmp.cols;x++){
-                qDebug()<<tmp.at<int16_t>(y,x);
-            }
-        }
-    }
-    exit(1);*/
 }
 
 void MotionCorrectionWorker::setCh(int ch){
@@ -173,12 +176,12 @@ void MotionCorrectionWorker::setCh(int ch){
 }
 
 void MotionCorrectionWorker::initImageRegistrator(){
+    if(!ir){
+        qDebug()<<"IR::initializing";
+        ir=std::make_shared<ImageRegistrator>();
+        qDebug()<<"IR::initialized";
+    }
     if(template_image.size()){
-        if(!ir){
-            qDebug()<<"IR::initializing";
-            ir=std::make_shared<ImageRegistrator>();
-            qDebug()<<"IR::initialized";
-        }
         qDebug()<<"IR::setting template";
         int template_ch= ch>1 && template_image.size()>ch-1?ch-1:template_image.size()-1;
         qDebug()<<"IR::template_ch=" << template_ch;
@@ -187,8 +190,6 @@ void MotionCorrectionWorker::initImageRegistrator(){
         qDebug()<<"IR::set template";
         ir->SetParameters(2,64,0,0,0,0);
         ir->Init();
-    }else{
-        ir=NULL;
     }
 }
 

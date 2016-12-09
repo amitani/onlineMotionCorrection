@@ -46,6 +46,8 @@ private:
     std::shared_ptr<SI4Image> temporary_data;
 
     static const int max_deque_size = 200;
+    static const int default_n_template = 30;
+    int n_template;
 
     std::deque<std::vector<cv::Mat>> deque_raw_;
     std::deque<std::vector<cv::Mat>> deque_shifted_;
