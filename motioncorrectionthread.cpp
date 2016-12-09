@@ -92,15 +92,43 @@ void MotionCorrectionWorker::check(){
                 shifted_frame.push_back(shifted_ch);
             }
             qDebug()<<"MCW::"<<et.elapsed()<<":shifted";
-            emit processed(raw_frame,shifted_frame);
+
+            mutex_.lock();
+            if(deque_raw_.size()>0){
+                if(deque_raw_[0].size()!=raw_frame.size()){
+                    qDebug()<<"QIUW::size discrepancy (ch), clearing deque";
+                    deque_raw_.clear();
+                    deque_shifted_.clear();
+                }else if(deque_raw_[0][0].cols!=raw_frame[0].cols){
+                    qDebug()<<"QIUW::size discrepancy (cols), clearing deque";
+                    deque_raw_.clear();
+                    deque_shifted_.clear();
+                }else if(deque_raw_[0][0].rows!=raw_frame[0].rows){
+                    qDebug()<<"QIUW::size discrepancy (rows), clearing deque";
+                    deque_raw_.clear();
+                    deque_shifted_.clear();
+                }
+            }
+            deque_raw_.push_front(raw_frame);
+            while(deque_raw_.size()>max_deque_size)deque_raw_.pop_back();
+            deque_shifted_.push_front(shifted_frame);
+            while(deque_shifted_.size()>max_deque_size)deque_shifted_.pop_back();
+            mutex_.unlock();
+            emit processed();
+
             qDebug()<<"MCW::"<<et.elapsed()<<":emitted";
-            qDebug()<<"MCW::processed";
         }else{
             qDebug()<<"MCW::no update";
         }
     }else{
         qDebug()<<"MCW::no IR";
     }
+}
+void MotionCorrectionWorker::getDeque(std::deque<std::vector<cv::Mat>> &deque_raw, std::deque<std::vector<cv::Mat>> &deque_shifted){
+    mutex_.lock();
+    deque_raw=deque_raw_;
+    deque_shifted=deque_shifted_;
+    mutex_.unlock();
 }
 
 void MotionCorrectionWorker::setTemplate(QString tifffilename){

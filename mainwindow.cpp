@@ -4,7 +4,7 @@
 #include <math.h>
 #include <QElapsedTimer>
 
-QImageUpdateWorker::QImageUpdateWorker(QObject* parent):QObject(parent),n_(1){
+QImageUpdateWorker::QImageUpdateWorker(QObject* parent,MotionCorrectionWorker *mcw):QObject(parent),n_(1),mcw_(mcw){
     channel_parameters.resize(3);
     for(auto&& ch:channel_parameters){
         ch.push_back(0);
@@ -36,63 +36,20 @@ void QImageUpdateWorker::setLimits(int ch, int type, int value){
     qDebug()<<"QIUW::setLimits::shown " << ch << ", " << type << ", " << value;
 }
 
-void QImageUpdateWorker::processed(std::vector<cv::Mat> raw, std::vector<cv::Mat> shifted){
-    qDebug()<<"QIUW::";
-    if(raw.empty()) return;
-/*    qDebug() << raw.size();
-    qDebug() << raw[0].cols;
-    qDebug() << raw[0].rows;
-    qDebug() << raw[0].at<int16_t>(5,5);
-    return;*/
-    if(raw.size()!=shifted.size()){
-        qDebug()<<"QIUW::Ch discrepancy between raw and shifted";
-        return;
-    }
-    if(raw[0].cols!=shifted[0].cols||raw[0].rows!=shifted[0].rows){
-        qDebug()<<"QIUW::Ch discrepancy between raw and shifted";
-        return;
-    }
-    for(int i=0;i<raw.size();i++){
-        if(raw[0].cols!=raw[i].cols||raw[0].cols!=shifted[i].cols){
-            qDebug()<<"QIUW::size discrepancy";
-            return;
-        }
-        if(raw[0].rows!=raw[i].rows||raw[0].rows!=shifted[i].rows){
-            qDebug()<<"QIUW::size discrepancy";
-            return;
-        }
-    }
-
-    if(deque_raw.size()>0){
-        if(deque_raw[0].size()!=raw.size()){
-            qDebug()<<"QIUW::size discrepancy (ch), clearing deque";
-            deque_raw.clear();
-            deque_shifted.clear();
-        }else if(deque_raw[0][0].cols!=raw[0].cols){
-            qDebug()<<"QIUW::size discrepancy (cols), clearing deque";
-            deque_raw.clear();
-            deque_shifted.clear();
-        }else if(deque_raw[0][0].rows!=raw[0].rows){
-            qDebug()<<"QIUW::size discrepancy (rows), clearing deque";
-            deque_raw.clear();
-            deque_shifted.clear();
-        }
-    }
-
-    QElapsedTimer et;
-    et.start();
-
-    deque_raw.push_front(raw);
-    while(deque_raw.size()>N_DEQUE)deque_raw.pop_back();
-    deque_shifted.push_front(shifted);
-    while(deque_shifted.size()>N_DEQUE)deque_shifted.pop_back();
-
-    show();
-}
-
 void QImageUpdateWorker::show(){
+    if(!mcw_) return;
     QElapsedTimer et;
     et.start();
+    qDebug()<<"QIUW::";
+    std::deque<std::vector<cv::Mat>> deque_raw;
+    std::deque<std::vector<cv::Mat>> deque_shifted;
+    mcw_->getDeque(deque_raw,deque_shifted);
+
+    if(deque_raw.empty() || deque_shifted.empty()) return;
+
+    std::vector<cv::Mat> raw = deque_raw[0];
+    std::vector<cv::Mat> shifted = deque_shifted[0];
+
 
     struct remap_to_uint8_c{
         unsigned int operator()(double x, std::vector<int> params){
@@ -240,7 +197,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(motion_correction_thread, SIGNAL(finished()), motion_correction_thread, SLOT(deleteLater()));
 
     qimage_update_thread=new QThread(this);
-    qiuw=new QImageUpdateWorker();
+    qiuw=new QImageUpdateWorker(NULL, mcw);
     QImageUpdateWorker* qiuw_=qiuw;
     for(int ch=0;ch<3;ch++){
         connect(minSliders[ch],&QSlider::valueChanged,[qiuw_, ch](int value){qiuw_->setLimits(ch,0,value);});
@@ -253,7 +210,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(qimage_update_thread, SIGNAL(finished()), qimage_update_thread, SLOT(deleteLater()));
 
     qRegisterMetaType<std::vector<cv::Mat>>();
-    connect(mcw,SIGNAL(processed(std::vector<cv::Mat>,std::vector<cv::Mat>)),qiuw,SLOT(processed(std::vector<cv::Mat>,std::vector<cv::Mat>)));
+    connect(mcw,SIGNAL(processed()),qiuw,SLOT(show()));
     connect(qiuw,SIGNAL(updated(QImage,QImage)),this,SLOT(updated(QImage,QImage)));
     connect(ui->comboBoxAverage,&QComboBox::currentTextChanged,[qiuw_](QString value){qiuw_->setNumAverage(value.toInt());});
 
