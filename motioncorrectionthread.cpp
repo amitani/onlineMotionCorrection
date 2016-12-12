@@ -14,7 +14,9 @@ MotionCorrectionWorker::MotionCorrectionWorker(QObject* parent):QObject(parent),
     connect(timer, SIGNAL(timeout()),this,SLOT(check()));
     ch=0;
     mmap_raw=std::make_shared<MMap<SI4Image>>("SI4_RAW");
-    mmap_shifted=std::make_shared<MMap<SI4Image>>("SI4_SHIFTED");
+    mmap_shifted=std::make_shared<MMap<SI4Image>>("MC_SHIFTED");
+    mmap_average=std::make_shared<MMap<SI4Image>>("MC_AVERAGE");
+    mmap_dislocation=std::make_shared<MMap<SmallDoubleMatrix>>("MC_DISLOCATION");
     qDebug()<<"MCW::Constructed";
     temporary_data=std::make_shared<SI4Image>();
 }
@@ -102,14 +104,29 @@ void MotionCorrectionWorker::check(){
             center.y = temporary_data->height / 2.0 - 0.5 + d.y;
             qDebug()<<"MCW::"<<center.x<<center.y;
             std::vector<cv::Mat> shifted_frame;
+            std::shared_ptr<SI4Image> si = std::make_shared<SI4Image>();
+            si->frame_tag=last_frame_tag;
+            si->height=temporary_data->height;
+            si->width=temporary_data->width;
+            si->n_ch=temporary_data->n_ch;
             for(int i=0;i<temporary_data->n_ch;i++){
                 cv::Mat shifted_ch;
                 cv::Mat tmp;
                 raw_frame[i].convertTo(tmp, CV_32FC1);
                 getRectSubPix(tmp, cv::Size(temporary_data->width, temporary_data->height), center, shifted_ch);
                 shifted_frame.push_back(shifted_ch);
+                shifted_ch.convertTo(tmp, CV_16S);
+                memcpy(si->data+i*tmp.cols*tmp.rows,tmp.data,sizeof(int16_t)*tmp.cols*tmp.rows);
             }
+            mmap_shifted->set(*si);
             qDebug()<<"MCW::"<<et.elapsed()<<":shifted";
+
+            SmallDoubleMatrix sdm;
+            sdm.height=2;sdm.width=1;sdm.data[0]=d.y;sdm.data[1]=d.x;
+            mmap_dislocation->set(sdm);
+
+
+
 
             mutex_.lock();
             if(deque_raw_.size()>0){
@@ -197,4 +214,5 @@ void MotionCorrectionWorker::loadParameters(QString xmlfilename){}
 
 MotionCorrectionWorker::~MotionCorrectionWorker()
 {
+    delete timer;
 }

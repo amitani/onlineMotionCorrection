@@ -68,13 +68,12 @@ void QImageUpdateWorker::show(){
     qDebug()<<"QIUW::averaging " << n_ << ", " << deque_raw.size() << ", " << N_DEQUE;
     qDebug()<<"QIUW::averaging " << n << " frames";
 
-    std::vector<cv::Mat>raw_average(deque_raw[0].size(),cv::Mat(deque_raw[0][0].rows,deque_raw[0][0].cols,CV_32F));
+    std::vector<cv::Mat>raw_average(deque_raw[0].size());
     for(int ch=0;ch<deque_raw[0].size();ch++){
-        for(int i=0;i<n;i++) raw_average[ch]+=deque_raw[i][ch];
+        raw_average[ch]=deque_raw[0][ch];
+        for(int i=1;i<n;i++) raw_average[ch]+=deque_raw[i][ch];
         raw_average[ch]/=(float)n;
-        //raw_average[ch]=deque_raw[0][ch];
     }
-
     QImage qimg_raw(raw_average[0].cols,raw_average[0].rows,QImage::Format_RGB32);
     for(int y=0;y<raw_average[0].rows;y++){
         for(int x=0;x<raw_average[0].cols;x++){
@@ -88,15 +87,12 @@ void QImageUpdateWorker::show(){
         }
     }
     qDebug()<<"QIUW::raw:"<<et.elapsed();
-    //qimg_raw=qimg_raw.mirrored(true,true);
-    //qDebug()<<et.elapsed();
 
-    std::vector<cv::Mat>shifted_average(deque_shifted[0].size(),cv::Mat(deque_shifted[0][0].rows,deque_shifted[0][0].cols,CV_32F));
+    std::vector<cv::Mat>shifted_average(deque_shifted[0].size());
     for(int ch=0;ch<deque_shifted[0].size();ch++){
-        for(int i=0;i<n;i++)shifted_average[ch]+=deque_shifted[i][ch];
+        shifted_average[ch]=deque_shifted[0][ch];
+        for(int i=1;i<n;i++)shifted_average[ch]+=deque_shifted[i][ch];
         shifted_average[ch]/=(float)n;
-        //shifted_average[ch]=deque_shifted[0][ch];
-
     }
     QImage qimg_shifted(shifted_average[0].cols,shifted_average[0].rows,QImage::Format_RGB32);
     for(int y=0;y<shifted_average[0].rows;y++){
@@ -110,8 +106,6 @@ void QImageUpdateWorker::show(){
                    qRgb(0,remap_to_uint8(shifted_average[0].at<float>(y,x),channel_parameters[1]),0));
         }
     }
-    //qDebug()<<et.elapsed();
-    //qimg_shifted=qimg_shifted.mirrored(true,true);
     qDebug()<<"QIUW::shifted:"<<et.elapsed();
 
     emit updated(qimg_raw,qimg_shifted);
@@ -210,10 +204,18 @@ MainWindow::MainWindow(QWidget *parent) :
         connect(checkBoxes[ch],&QCheckBox::stateChanged, [qiuw_, ch](int value){qiuw_->setLimits(ch,2,value);});
     }
     qiuw->moveToThread(qimage_update_thread);
+    graphicsSceneRaw=new QGraphicsScene();
+    graphicsSceneShifted=new QGraphicsScene();
+    pixmapItemRaw=graphicsSceneRaw->addPixmap(QPixmap());
+    pixmapItemShifted=graphicsSceneShifted->addPixmap(QPixmap());
+    ui->graphicsViewRaw->setScene(graphicsSceneRaw);
+    ui->graphicsViewCorrected->setScene(graphicsSceneShifted);
+
     connect(qimage_update_thread, SIGNAL(finished()), qiuw, SLOT(deleteLater()));
     connect(qimage_update_thread, SIGNAL(finished()), qimage_update_thread, SLOT(deleteLater()));
-
-    qRegisterMetaType<std::vector<cv::Mat>>();
+    connect(qimage_update_thread, SIGNAL(finished()), graphicsSceneRaw, SLOT(deleteLater()));
+    connect(qimage_update_thread, SIGNAL(finished()), graphicsSceneShifted, SLOT(deleteLater()));
+    //qRegisterMetaType<std::vector<cv::Mat>>();
     connect(mcw,SIGNAL(processed()),qiuw,SLOT(show()));
     connect(qiuw,SIGNAL(updated(QImage,QImage)),this,SLOT(updated(QImage,QImage)));
     connect(ui->comboBoxAverage,&QComboBox::currentTextChanged,[qiuw_](QString value){qiuw_->setNumAverage(value.toInt());});
@@ -224,21 +226,15 @@ MainWindow::MainWindow(QWidget *parent) :
 }
 void MainWindow::updated(QImage qimg_raw, QImage qimg_shifted){
     qDebug()<<"MW::updating images";
-    QPixmap pixmap;
-    QGraphicsScene* scene;
 
-    scene = new QGraphicsScene();
-    pixmap.convertFromImage(qimg_raw);
-    scene->addPixmap(pixmap);
-    scene->setSceneRect(qimg_raw.rect());
-    ui->graphicsViewRaw->setScene(scene);
+    pixmapItemRaw->setPixmap(QPixmap::fromImage(qimg_raw));
+    graphicsSceneRaw->setSceneRect(pixmapItemRaw->pixmap().rect());
 
-    scene = new QGraphicsScene();
-    pixmap.convertFromImage(qimg_shifted);
-    scene->addPixmap(pixmap);
-    scene->setSceneRect(qimg_shifted.rect());
-    ui->graphicsViewCorrected->setScene(scene);
+    pixmapItemShifted->setPixmap(QPixmap::fromImage(qimg_shifted));
+    graphicsSceneShifted->setSceneRect(pixmapItemShifted->pixmap().rect());
+
     qDebug()<<"MW::updated";
+//    delete scene;
     return;
 }
 

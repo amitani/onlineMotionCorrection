@@ -7,6 +7,8 @@
 #include <QCheckBox>
 #include <QTimer>
 #include <QCommandLineParser>
+#include <QGraphicsScene>
+#include <QGraphicsPixmapItem>
 #include <QThread>
 #include <vector>
 #include <deque>
@@ -66,6 +68,11 @@ private:
     std::vector<QSpinBox*> minSpinBoxes;
     std::vector<QSpinBox*> maxSpinBoxes;
     std::vector<QCheckBox*> checkBoxes;
+    QGraphicsScene* graphicsSceneRaw;
+    QGraphicsScene* graphicsSceneShifted;
+    QGraphicsPixmapItem* pixmapItemRaw;
+    QGraphicsPixmapItem* pixmapItemShifted;
+
 
     QThread* motion_correction_thread;
     QThread* qimage_update_thread;
