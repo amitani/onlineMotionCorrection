@@ -40,6 +40,8 @@ private:
     QTimer* timer;
     std::shared_ptr<MMap<SI4Image>> mmap_raw;
     std::shared_ptr<MMap<SI4Image>> mmap_shifted;
+    std::shared_ptr<MMap<SI4Image>> mmap_average;
+    std::shared_ptr<MMap<SmallDoubleMatrix>> mmap_dislocation;
     std::vector<cv::Mat> template_image;
     int ch;
     std::shared_ptr<ImageRegistrator> ir;
