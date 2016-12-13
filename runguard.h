@@ -5,6 +5,7 @@
 #include <QSharedMemory>
 #include <QSystemSemaphore>
 
+// http://stackoverflow.com/questions/5006547/qt-best-practice-for-a-single-instance-app-protection
 
 class RunGuard
 {

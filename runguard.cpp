@@ -2,6 +2,7 @@
 
 #include <QCryptographicHash>
 
+// http://stackoverflow.com/questions/5006547/qt-best-practice-for-a-single-instance-app-protection
 
 namespace
 {
