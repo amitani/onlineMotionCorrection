@@ -19,14 +19,16 @@ SOURCES += main.cpp\
         mainwindow.cpp \
     motioncorrectionthread.cpp \
     CV_SubPix.cpp \
-    image_registrator.cpp
+    image_registrator.cpp \
+    runguard.cpp
 
 HEADERS  += mainwindow.h \
     motioncorrectionthread.h \
     mmap.h \
     CV_SubPix.h \
     image_registrator.h \
-    CImg.h
+    CImg.h \
+    runguard.h
 
 FORMS    += mainwindow.ui
 
