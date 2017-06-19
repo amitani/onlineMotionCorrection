@@ -92,7 +92,7 @@ private:
     QThread* qimage_update_thread;
     MotionCorrectionWorker* mcw;
     QImageUpdateWorker* qiuw;
-
+    std::string logFileName;
 };
 
 #endif // MAINWINDOW_H

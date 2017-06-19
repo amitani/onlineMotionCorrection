@@ -3,6 +3,15 @@
 #include <QDebug>
 #include <math.h>
 #include <QElapsedTimer>
+#include <QFileInfo>
+#include <QDir>
+#include <fstream>
+#include <sstream>
+#include <ctime>
+#include <iomanip>
+
+#include <chrono>
+#include <thread>
 
 QImageUpdateWorker::QImageUpdateWorker(QObject* parent,MotionCorrectionWorker *mcw):QObject(parent),n_(1),mcw_(mcw){
     channel_parameters.resize(3);
@@ -209,14 +218,24 @@ MainWindow::MainWindow(QWidget *parent) :
                 qDebug()<<chStr;
                 mcw->setCh(chStr.toInt());
             }
+            QString baseFileName;
             if(args.size()==0){
                 qDebug()<<"using moving average as template";
                 ui->labelTiff->setText("Moving average");
+                logFileName = "";
             }else{
                 qDebug()<<args[0];
                 mcw->setTemplate(args[0]);
                 ui->labelTiff->setText(args[0]);
+                baseFileName = args[0];
+                auto q = QFileInfo(baseFileName);
+                std::ostringstream ss;
+                auto t = std::time(nullptr);
+                auto tm = *std::localtime(&t);
+                ss << std::put_time(&tm, "_%y%m%d_%H%M%S") << ".log";
+                logFileName = (q.canonicalPath() + QDir::separator()+q.baseName()).toStdString()+ss.str();
             }
+
             qDebug()<<"Init";
             mcw->initImageRegistrator();
         }
@@ -263,6 +282,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->pushButton,SIGNAL(clicked()),this, SLOT(updateParameters()));
     connect(this,SIGNAL(parametersUpdated(double,int,double,double,double,int)),
             mcw,SLOT(setParameters(double,int,double,double,double,int)));
+    updateParameters();
 }
 void MainWindow::updated(QImage qimg_raw, QImage qimg_shifted){
     qDebug()<<"MW::updating images";
@@ -285,6 +305,22 @@ void MainWindow::updateParameters(){
         intManager[1]->setValue(intProperties[1][j],val[j]);
     }
     emit parametersUpdated(val[0],val[1],val[2],val[3],val[4],val[5]);
+    if(!logFileName.empty()){
+        auto t = std::time(nullptr);
+        auto tm = *std::localtime(&t);
+        bool done=false;
+        for(int j=0;j<5 && !done;j++){
+            try{
+                std::ofstream outfile(logFileName,std::ios_base::app);
+                outfile<<std::put_time(&tm, "\"%Y/%m/%d_%H:%M:%S\"");
+                for(int i=0;i<6;i++) outfile << ", " << val[i];
+                outfile << std::endl;
+                done=true;
+            }catch(std::exception &e){
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+        }
+    }
 }
 
 
