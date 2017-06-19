@@ -217,6 +217,7 @@ void MotionCorrectionWorker::initImageRegistrator(){
 void MotionCorrectionWorker::setParameters(double factor, int margin, double sigma_smoothing,
                                            double sigma_normalization, double normalization_offset, int to_equalize_histogram){
     ir->SetParameters(factor,margin,sigma_smoothing,sigma_normalization,normalization_offset,to_equalize_histogram);
+    ir->Init();
 }
 
 MotionCorrectionWorker::~MotionCorrectionWorker()

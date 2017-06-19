@@ -11,9 +11,13 @@ QImageUpdateWorker::QImageUpdateWorker(QObject* parent,MotionCorrectionWorker *m
         ch.push_back(8192);
         ch.push_back(1);
     }
+    timer = new QTimer(this);
+    timer->setInterval(50);
+    connect(timer, SIGNAL(timeout()),this,SLOT(show()));
 }
 
 QImageUpdateWorker::~QImageUpdateWorker(){
+    delete timer;
 }
 
 void QImageUpdateWorker::setNumAverage(int n){
@@ -30,23 +34,24 @@ void QImageUpdateWorker::setLimits(int ch, int type, int value){
     if(type<0) return;
     if(type>2) return;
 
+    if(channel_parameters[ch][type]== value) return;
     channel_parameters[ch][type]=value;
     qDebug()<<"QIUW::setLimits::set " << ch << ", " << type << ", " << value;
-    show();
-    qDebug()<<"QIUW::setLimits::shown " << ch << ", " << type << ", " << value;
 }
 
 void QImageUpdateWorker::show(){
     if(!mcw_) return;
 
     static QElapsedTimer staticET;
-    if(staticET.isValid() && staticET.elapsed() < 30)
+    if(staticET.isValid() && staticET.elapsed() < 10)
         return;
     staticET.start();
 
+#ifdef DEBUG
     QElapsedTimer et;
     et.start();
     qDebug()<<"QIUW::";
+#endif
     std::deque<std::vector<cv::Mat>> deque_raw;
     std::deque<std::vector<cv::Mat>> deque_shifted;
     std::deque<int> deque_frame_tag;
@@ -69,14 +74,12 @@ void QImageUpdateWorker::show(){
     qDebug()<<"QIUW::averaging " << n << " frames";
 
     struct remapped_average_c{
-        struct remap_to_uint8_c{
-            unsigned int operator()(double x, std::vector<int> params){
-                return params.size()>2&&params[2]?cv::saturate_cast<unsigned char>(256.0*(x-params[0])/(params[1]-params[0])):0;
-            }
-        } remap_to_uint8;
-
-        QImage operator ()(std::deque<std::vector<cv::Mat>> deq, int n, std::vector<std::vector<int>> channel_parameters){
-            std::vector<cv::Mat>average(deq[0].size());
+        inline unsigned int remap_to_uint8(double x, std::vector<int> params){
+            return params.size()>2&&params[2]?cv::saturate_cast<unsigned char>(256.0*(x-params[0])/(params[1]-params[0])):0;
+        }
+        std::vector<cv::Mat> average;
+        QImage operator ()(std::deque<std::vector<cv::Mat>> &deq, int n, std::vector<std::vector<int>>& channel_parameters){
+            average.resize(deq[0].size());
             for(int ch=0;ch<deq[0].size();ch++){
                 average[ch]=deq[0][ch];
                 for(int i=1;i<n;i++) average[ch]+=deq[i][ch];
@@ -86,7 +89,7 @@ void QImageUpdateWorker::show(){
             for(int y=0;y<average[0].rows;y++){
                 for(int x=0;x<average[0].cols;x++){
                     qimg.setPixel(y,x,
-                       qRgb(average.size()==1?0:remap_to_uint8(average[1].at<float>(y,x),channel_parameters[1]),
+                       qRgb(average.size()==1||channel_parameters[1][2]==0?0:remap_to_uint8(average[1].at<float>(y,x),channel_parameters[1]),
                             remap_to_uint8(average[0].at<float>(y,x),channel_parameters[0]),
                             0));
                 }
@@ -97,9 +100,9 @@ void QImageUpdateWorker::show(){
 
     QImage qimg_raw = remapped_average(deque_raw, n, channel_parameters);
     QImage qimg_shifted = remapped_average(deque_shifted, n, channel_parameters);
-
+#ifdef DEBUG
     qDebug()<<"QIUW::shifted:"<<et.elapsed();
-
+#endif
     emit updated(qimg_raw,qimg_shifted);
     qDebug()<<"QIUW::done";
 }
@@ -281,7 +284,7 @@ void MainWindow::updateParameters(){
         val[j]=intManager[0]->value(intProperties[0][j]);
         intManager[1]->setValue(intProperties[1][j],val[j]);
     }
-    //emit parametersUpdated(val[0],val[1],val[2],val[3],val[4],val[5]);
+    emit parametersUpdated(val[0],val[1],val[2],val[3],val[4],val[5]);
 }
 
 
