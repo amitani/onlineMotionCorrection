@@ -2,14 +2,17 @@
 #include <QtDebug>
 #include <QElapsedTimer>
 
+/*
 #define cimg_use_tiff
 #include "CImg.h"
+//#pragma comment(lib, "libtiff.lib")
 using namespace cimg_library;
+*/
 
 MotionCorrectionWorker::MotionCorrectionWorker(QObject* parent):QObject(parent), n_template(default_n_template)
 {
     timer = new QTimer(this);
-    timer->setInterval(5);
+    timer->setInterval(10);
     //connect(timer, &QTimer::timeout,this,&MotionCorrectionWorker::check);
     connect(timer, SIGNAL(timeout()),this,SLOT(check()));
     ch=0;
@@ -55,7 +58,7 @@ void MotionCorrectionWorker::check(){
             }
             qDebug()<<"MCW::"<<et.elapsed()<<":copied";
 
-            int ch_to_align= ch && ch<temporary_data->n_ch?ch:temporary_data->n_ch-1;
+            int ch_to_align= ch && ch<temporary_data->n_ch?ch-1:temporary_data->n_ch-1;
             qDebug()<<"MCW::ch "<<ch_to_align;
             cv::Point2d d;
             cv::Mat heatmap;
@@ -173,7 +176,7 @@ void MotionCorrectionWorker::getDeque(std::deque<std::vector<cv::Mat>> &deque_ra
 }
 
 void MotionCorrectionWorker::setTemplate(QString tifffilename){
-    CImgList<int16_t> cimglist;
+    /*CImgList<int16_t> cimglist;
     cimglist.load_tiff(tifffilename.toStdString().c_str(), 0);
     template_image.reserve(cimglist.size());
     qDebug()<<template_image.size();
@@ -182,10 +185,13 @@ void MotionCorrectionWorker::setTemplate(QString tifffilename){
         qDebug()<<cimg.height()<<cimg.width();
         cimg.transpose();
         cv::Mat tmp(cimg.height(), cimg.width(), CV_16SC1, cimg.data());
-
-
         template_image.push_back(tmp.clone());
-    }
+    }*/
+
+    template_image = cv::imread(tifffilename.toStdString(),CV_LOAD_IMAGE_ANYDEPTH);
+    cv::Mat tmp;
+    //template_image.convertTo(tmp,CV_8U);
+    //cv::imshow(tifffilename.toStdString(),tmp);
 }
 
 void MotionCorrectionWorker::setCh(int ch){
@@ -196,21 +202,22 @@ void MotionCorrectionWorker::initImageRegistrator(){
     if(!ir){
         qDebug()<<"IR::initializing";
         ir=std::make_shared<ImageRegistrator>();
+        ir->SetParameters(2,64,0,0,0,0);
         qDebug()<<"IR::initialized";
     }
-    if(template_image.size()){
+    if(!template_image.empty()){
         qDebug()<<"IR::setting template";
-        int template_ch= ch>1 && template_image.size()>ch-1?ch-1:template_image.size()-1;
-        qDebug()<<"IR::template_ch=" << template_ch;
-        qDebug()<<"IR::template_size=" << template_image.size();
-        ir->SetTemplate(template_image[template_ch]);
+        qDebug()<<"IR::template_size=" << template_image.size;
+        ir->SetTemplate(template_image);
         qDebug()<<"IR::set template";
-        ir->SetParameters(2,64,0,0,0,0);
         ir->Init();
     }
 }
 
-void MotionCorrectionWorker::loadParameters(QString xmlfilename){}
+void MotionCorrectionWorker::setParameters(double factor, int margin, double sigma_smoothing,
+                                           double sigma_normalization, double normalization_offset, int to_equalize_histogram){
+    ir->SetParameters(factor,margin,sigma_smoothing,sigma_normalization,normalization_offset,to_equalize_histogram);
+}
 
 MotionCorrectionWorker::~MotionCorrectionWorker()
 {

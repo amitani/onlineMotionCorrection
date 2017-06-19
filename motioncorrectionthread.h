@@ -25,12 +25,13 @@ public slots:
     void start();
     void stop();
     void check();
+    void setParameters(double factor, int margin, double sigma_smoothing,
+                       double sigma_normalization, double normalization_offset, int to_equalize_histogram);
 
 public:
     void setTemplate(QString tifffilename);
     void setCh(int ch);
     void initImageRegistrator();
-    void loadParameters(QString xmlfilename);
     void getDeque(std::deque<std::vector<cv::Mat>> &deque_raw, std::deque<std::vector<cv::Mat>> &deque_shifted, std::deque<int> &deque_frame_tag);
 
 signals:
@@ -42,7 +43,7 @@ private:
     std::shared_ptr<MMap<SI4Image>> mmap_shifted;
     std::shared_ptr<MMap<SI4Image>> mmap_average;
     std::shared_ptr<MMap<SmallDoubleMatrix>> mmap_dislocation;
-    std::vector<cv::Mat> template_image;
+    cv::Mat template_image;
     int ch;
     std::shared_ptr<ImageRegistrator> ir;
     std::shared_ptr<SI4Image> temporary_data;

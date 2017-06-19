@@ -3,8 +3,12 @@
 #include <RunGuard.h>
 #include <QMessageBox>
 
+#include <iostream>
+
 int main(int argc, char *argv[])
 {
+    //std::cout << "main()" << std::endl;
+
     QApplication a(argc, argv);
 
     RunGuard guard( "am_motion_correction_runguard" );

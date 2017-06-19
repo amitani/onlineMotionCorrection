@@ -10,9 +10,15 @@
 #include <QGraphicsScene>
 #include <QGraphicsPixmapItem>
 #include <QThread>
+#include <QtTreePropertyBrowser>
 #include <vector>
 #include <deque>
 #include <motioncorrectionthread.h>
+
+#include "qtpropertymanager.h"
+#include "qteditorfactory.h"
+#include "qttreepropertybrowser.h"
+
 
 #include <QImage>
 class QImageUpdateWorker:public QObject
@@ -60,6 +66,11 @@ public:
 
 public slots:
     void updated(QImage raw, QImage shifted);
+    void updateParameters();
+
+signals:
+    void parametersUpdated(double factor, int margin, double sigma_smoothing, double sigma_normalization,
+                            double normalization_offset, int to_equalize_histogram);
 
 private:
     Ui::MainWindow *ui;
@@ -72,7 +83,9 @@ private:
     QGraphicsScene* graphicsSceneShifted;
     QGraphicsPixmapItem* pixmapItemRaw;
     QGraphicsPixmapItem* pixmapItemShifted;
-
+    QtTreePropertyBrowser* propertyBrowser[2]; // 0=new, 1=current
+    QtIntPropertyManager* intManager[2];
+    std::vector<QtProperty*> intProperties[2];
 
     QThread* motion_correction_thread;
     QThread* qimage_update_thread;

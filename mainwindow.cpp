@@ -38,6 +38,12 @@ void QImageUpdateWorker::setLimits(int ch, int type, int value){
 
 void QImageUpdateWorker::show(){
     if(!mcw_) return;
+
+    static QElapsedTimer staticET;
+    if(staticET.isValid() && staticET.elapsed() < 30)
+        return;
+    staticET.start();
+
     QElapsedTimer et;
     et.start();
     qDebug()<<"QIUW::";
@@ -54,12 +60,6 @@ void QImageUpdateWorker::show(){
     std::vector<cv::Mat> raw = deque_raw[0];
     std::vector<cv::Mat> shifted = deque_shifted[0];
 
-    struct remap_to_uint8_c{
-        unsigned int operator()(double x, std::vector<int> params){
-            return params.size()>2&&params[2]?cv::saturate_cast<unsigned char>(256.0*(x-params[0])/(params[1]-params[0])):0;
-        }
-    } remap_to_uint8;
-
     if(deque_raw.empty()){
         qDebug()<<"QIUW::deque empty";
         return;
@@ -68,44 +68,36 @@ void QImageUpdateWorker::show(){
     qDebug()<<"QIUW::averaging " << n_ << ", " << deque_raw.size() << ", " << N_DEQUE;
     qDebug()<<"QIUW::averaging " << n << " frames";
 
-    std::vector<cv::Mat>raw_average(deque_raw[0].size());
-    for(int ch=0;ch<deque_raw[0].size();ch++){
-        raw_average[ch]=deque_raw[0][ch];
-        for(int i=1;i<n;i++) raw_average[ch]+=deque_raw[i][ch];
-        raw_average[ch]/=(float)n;
-    }
-    QImage qimg_raw(raw_average[0].cols,raw_average[0].rows,QImage::Format_RGB32);
-    for(int y=0;y<raw_average[0].rows;y++){
-        for(int x=0;x<raw_average[0].cols;x++){
-            if(raw_average.size()>1)
-                qimg_raw.setPixel(y,x,
-                   qRgb(remap_to_uint8(raw_average[1].at<float>(y,x),channel_parameters[1]),
-                                  remap_to_uint8(raw_average[0].at<float>(y,x),channel_parameters[0]),0));
-            else
-                qimg_raw.setPixel(y,x,
-                   qRgb(0,remap_to_uint8(raw_average[0].at<float>(y,x),channel_parameters[1]),0));
-        }
-    }
-    qDebug()<<"QIUW::raw:"<<et.elapsed();
+    struct remapped_average_c{
+        struct remap_to_uint8_c{
+            unsigned int operator()(double x, std::vector<int> params){
+                return params.size()>2&&params[2]?cv::saturate_cast<unsigned char>(256.0*(x-params[0])/(params[1]-params[0])):0;
+            }
+        } remap_to_uint8;
 
-    std::vector<cv::Mat>shifted_average(deque_shifted[0].size());
-    for(int ch=0;ch<deque_shifted[0].size();ch++){
-        shifted_average[ch]=deque_shifted[0][ch];
-        for(int i=1;i<n;i++)shifted_average[ch]+=deque_shifted[i][ch];
-        shifted_average[ch]/=(float)n;
-    }
-    QImage qimg_shifted(shifted_average[0].cols,shifted_average[0].rows,QImage::Format_RGB32);
-    for(int y=0;y<shifted_average[0].rows;y++){
-        for(int x=0;x<shifted_average[0].cols;x++){
-            if(shifted_average.size()>1)
-                qimg_shifted.setPixel(y,x,
-                   qRgb(remap_to_uint8(shifted_average[1].at<float>(y,x),channel_parameters[1]),
-                                      remap_to_uint8(shifted_average[0].at<float>(y,x),channel_parameters[0]),0));
-            else
-                qimg_shifted.setPixel(y,x,
-                   qRgb(0,remap_to_uint8(shifted_average[0].at<float>(y,x),channel_parameters[1]),0));
+        QImage operator ()(std::deque<std::vector<cv::Mat>> deq, int n, std::vector<std::vector<int>> channel_parameters){
+            std::vector<cv::Mat>average(deq[0].size());
+            for(int ch=0;ch<deq[0].size();ch++){
+                average[ch]=deq[0][ch];
+                for(int i=1;i<n;i++) average[ch]+=deq[i][ch];
+                average[ch]/=(float)n;
+            }
+            QImage qimg(average[0].cols,average[0].rows,QImage::Format_RGB32);
+            for(int y=0;y<average[0].rows;y++){
+                for(int x=0;x<average[0].cols;x++){
+                    qimg.setPixel(y,x,
+                       qRgb(average.size()==1?0:remap_to_uint8(average[1].at<float>(y,x),channel_parameters[1]),
+                            remap_to_uint8(average[0].at<float>(y,x),channel_parameters[0]),
+                            0));
+                }
+            }
+            return qimg;
         }
-    }
+    } remapped_average;
+
+    QImage qimg_raw = remapped_average(deque_raw, n, channel_parameters);
+    QImage qimg_shifted = remapped_average(deque_shifted, n, channel_parameters);
+
     qDebug()<<"QIUW::shifted:"<<et.elapsed();
 
     emit updated(qimg_raw,qimg_shifted);
@@ -151,6 +143,44 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->graphicsViewRaw->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     ui->graphicsViewCorrected->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     ui->graphicsViewCorrected->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    for(int i=0;i<2;i++){
+        QWidget* w= i==0?ui->widgetNew:ui->widgetCurrent;
+        intManager[i] = new QtIntPropertyManager(w);
+        QtSpinBoxFactory *spinBoxFactory = new QtSpinBoxFactory(w);
+        propertyBrowser[i] = new QtTreePropertyBrowser(w);
+        if(i==0) propertyBrowser[i]->setFactoryForManager(intManager[i], spinBoxFactory);
+        auto property=intManager[i]->addProperty("Factor");
+        intProperties[i].push_back(property);
+        intManager[i]->setRange(property,0,64);
+        intManager[i]->setValue(property,2);
+        propertyBrowser[i]->addProperty(property);
+        property=intManager[i]->addProperty("Margin");
+        intProperties[i].push_back(property);
+        intManager[i]->setRange(property,0,128);
+        intManager[i]->setValue(property,64);
+        propertyBrowser[i]->addProperty(property);
+        property=intManager[i]->addProperty("S_smooth");
+        intProperties[i].push_back(property);
+        intManager[i]->setRange(property,0,128);
+        intManager[i]->setValue(property,0);
+        propertyBrowser[i]->addProperty(property);
+        property=intManager[i]->addProperty("S_norm");
+        intProperties[i].push_back(property);
+        intManager[i]->setRange(property,0,128);
+        intManager[i]->setValue(property,0);
+        propertyBrowser[i]->addProperty(property);
+        property=intManager[i]->addProperty("Norm_offset");
+        intProperties[i].push_back(property);
+        intManager[i]->setRange(property,-8192,8192);
+        intManager[i]->setValue(property,0);
+        propertyBrowser[i]->addProperty(property);
+        property=intManager[i]->addProperty("Histgram equal");
+        intProperties[i].push_back(property);
+        intManager[i]->setRange(property,0,1);
+        intManager[i]->setValue(property,0);
+        propertyBrowser[i]->addProperty(property);
+        propertyBrowser[i]->setResizeMode(propertyBrowser[i]->Stretch);
+    }
 
     mcw=new MotionCorrectionWorker();
     QStringList argv=QCoreApplication::arguments();
@@ -197,11 +227,13 @@ MainWindow::MainWindow(QWidget *parent) :
 
     qimage_update_thread=new QThread(this);
     qiuw=new QImageUpdateWorker(NULL, mcw);
-    QImageUpdateWorker* qiuw_=qiuw;
+    QImageUpdateWorker* qiuw_=qiuw; // necessary for closure
     for(int ch=0;ch<3;ch++){
         connect(minSliders[ch],&QSlider::valueChanged,[qiuw_, ch](int value){qiuw_->setLimits(ch,0,value);});
         connect(maxSliders[ch],&QSlider::valueChanged,[qiuw_, ch](int value){qiuw_->setLimits(ch,1,value);});
         connect(checkBoxes[ch],&QCheckBox::stateChanged, [qiuw_, ch](int value){qiuw_->setLimits(ch,2,value);});
+        qiuw->setLimits(ch,0,minSliders[ch]->value());
+        qiuw->setLimits(ch,1,maxSliders[ch]->value());
     }
     qiuw->moveToThread(qimage_update_thread);
     graphicsSceneRaw=new QGraphicsScene();
@@ -219,33 +251,46 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(mcw,SIGNAL(processed()),qiuw,SLOT(show()));
     connect(qiuw,SIGNAL(updated(QImage,QImage)),this,SLOT(updated(QImage,QImage)));
     connect(ui->comboBoxAverage,&QComboBox::currentTextChanged,[qiuw_](QString value){qiuw_->setNumAverage(value.toInt());});
+    qiuw->setNumAverage(ui->comboBoxAverage->currentText().toInt());
 
     motion_correction_thread->start();
     qimage_update_thread->start();
     qDebug()<<"Started thread";
+
+    connect(ui->pushButton,SIGNAL(clicked()),this, SLOT(updateParameters()));
+    connect(this,SIGNAL(parametersUpdated(double,int,double,double,double,int)),
+            mcw,SLOT(setParameters(double,int,double,double,double,int)));
 }
 void MainWindow::updated(QImage qimg_raw, QImage qimg_shifted){
     qDebug()<<"MW::updating images";
 
     pixmapItemRaw->setPixmap(QPixmap::fromImage(qimg_raw));
-    graphicsSceneRaw->setSceneRect(pixmapItemRaw->pixmap().rect());
+    //graphicsSceneRaw->setSceneRect(pixmapItemRaw->pixmap().rect());
 
     pixmapItemShifted->setPixmap(QPixmap::fromImage(qimg_shifted));
-    graphicsSceneShifted->setSceneRect(pixmapItemShifted->pixmap().rect());
+    //graphicsSceneShifted->setSceneRect(pixmapItemShifted->pixmap().rect());
 
     qDebug()<<"MW::updated";
 //    delete scene;
     return;
 }
 
+void MainWindow::updateParameters(){
+    int val[6];
+    for(int j=0;j<intManager[0]->properties().size();j++){
+        val[j]=intManager[0]->value(intProperties[0][j]);
+        intManager[1]->setValue(intProperties[1][j],val[j]);
+    }
+    //emit parametersUpdated(val[0],val[1],val[2],val[3],val[4],val[5]);
+}
 
 
 MainWindow::~MainWindow()
 {
-    motion_correction_thread->exit();
     qimage_update_thread->exit();
-    motion_correction_thread->wait();
     qimage_update_thread->wait();
+    motion_correction_thread->exit();
+    motion_correction_thread->wait();
     delete ui;
 }
 
