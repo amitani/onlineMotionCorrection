@@ -202,7 +202,7 @@ void MotionCorrectionWorker::initImageRegistrator(){
     if(!ir){
         qDebug()<<"IR::initializing";
         ir=std::make_shared<ImageRegistrator>();
-        ir->SetParameters(2,64,0,0,0,0);
+        //ir->SetParameters(2,64,0,0,0,0); default parameter is set in ImageRegister
         qDebug()<<"IR::initialized";
     }
     if(!template_image.empty()){
@@ -217,7 +217,9 @@ void MotionCorrectionWorker::initImageRegistrator(){
 void MotionCorrectionWorker::setParameters(double factor, int margin, double sigma_smoothing,
                                            double sigma_normalization, double normalization_offset, int to_equalize_histogram){
     ir->SetParameters(factor,margin,sigma_smoothing,sigma_normalization,normalization_offset,to_equalize_histogram);
-    ir->Init();
+    if(!template_image.empty()){
+        ir->Init();
+    }
 }
 
 MotionCorrectionWorker::~MotionCorrectionWorker()

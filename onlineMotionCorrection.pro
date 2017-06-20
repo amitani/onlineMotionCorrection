@@ -12,8 +12,10 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 TARGET = onlineMotionCorrection
 TEMPLATE = app
 
-INCLUDEPATH += C:\Users\Akinori\Downloads\opencv\build\include
-LIBS += -LC:\Users\Akinori\Downloads\opencv\build\x64\vc14\lib
+//INCLUDEPATH += C:\Users\Akinori\Downloads\opencv\build_binary\include
+//LIBS += -LC:\Users\Akinori\Downloads\opencv\build_binary\x64\vc14\lib
+INCLUDEPATH += C:\Users\Akinori\Downloads\opencv\build\install\include
+LIBS += -LC:\Users\Akinori\Downloads\opencv\build\install\x64\vc12\lib
 
 SOURCES += main.cpp\
         mainwindow.cpp \
