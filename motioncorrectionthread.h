@@ -13,6 +13,8 @@
 
 Q_DECLARE_METATYPE(cv::Mat)
 
+void SetMatInMMap(std::shared_ptr<MMap<SI4Image>> mmap, std::vector<cv::Mat> mat, int frame_tag);
+
 class MotionCorrectionWorker:public QObject
 {
     Q_OBJECT
@@ -50,7 +52,6 @@ private:
     std::shared_ptr<ImageRegistrator> ir;
     std::shared_ptr<SI4Image> temporary_data;
 
-    static void SetMatInMMap(std::shared_ptr<MMap<SI4Image>> mmap, std::vector<cv::Mat> mat, int frame_tag);
 
 /*
     static const int max_deque_size = 200;

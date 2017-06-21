@@ -9,7 +9,7 @@
 using namespace cimg_library;
 */
 
-void MotionCorrectionWorker::SetMatInMMap(std::shared_ptr<MMap<SI4Image>> mmap, std::vector<cv::Mat> mat, int frame_tag){
+void SetMatInMMap(std::shared_ptr<MMap<SI4Image>> mmap, std::vector<cv::Mat> mat, int frame_tag){
     static std::shared_ptr<SI4Image> si = std::make_shared<SI4Image>();
     if(mat.empty()) return;
     si->frame_tag=frame_tag;
@@ -18,6 +18,7 @@ void MotionCorrectionWorker::SetMatInMMap(std::shared_ptr<MMap<SI4Image>> mmap, 
     si->width=cols;
     si->height=rows;
     si->n_ch = mat.size();
+    assert(cols*rows*mat.size()<SI4Image::max_size);
     for(int i=0;i<mat.size();i++){
         if(mat[i].cols!=cols) return;
         if(mat[i].rows!=rows) return;
@@ -102,7 +103,7 @@ void MotionCorrectionWorker::check(){
             center.x = temporary_data->width / 2.0 - 0.5 + d.x;
             center.y = temporary_data->height / 2.0 - 0.5 + d.y;
             qDebug()<<"MCW::"<<center.x<<center.y;
-            std::vector<cv::Mat> shifted_frame;
+            std::vector<cv::Mat> shifted_frame;   // Todo: Technically we can reuse this without allocating everytime to save some time.
             for(int i=0;i<temporary_data->n_ch;i++){
                 cv::Mat shifted_ch;
                 cv::Mat tmp;
