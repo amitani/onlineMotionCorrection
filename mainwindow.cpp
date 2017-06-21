@@ -13,7 +13,7 @@
 #include <chrono>
 #include <thread>
 
-QImageUpdateWorker::QImageUpdateWorker(QObject* parent,MotionCorrectionWorker *mcw):QObject(parent),n_(1),mcw_(mcw){
+QImageUpdateWorker::QImageUpdateWorker(QObject* parent,MotionCorrectionWorker *mcw):QObject(parent),mcw_(mcw){
     channel_parameters.resize(3);
     for(auto&& ch:channel_parameters){
         ch.push_back(0);
@@ -27,13 +27,6 @@ QImageUpdateWorker::QImageUpdateWorker(QObject* parent,MotionCorrectionWorker *m
 
 QImageUpdateWorker::~QImageUpdateWorker(){
     delete timer;
-}
-
-void QImageUpdateWorker::setNumAverage(int n){
-    if(n<=0) return;
-    if(n>=200) return;
-    n_=n;
-    return;
 }
 
 void QImageUpdateWorker::setLimits(int ch, int type, int value){
@@ -56,62 +49,65 @@ void QImageUpdateWorker::show(){
         return;
     staticET.start();
 
-#ifdef DEBUG
-    QElapsedTimer et;
-    et.start();
-    qDebug()<<"QIUW::";
-#endif
-    std::deque<std::vector<cv::Mat>> deque_raw;
+//    QElapsedTimer et;
+//    et.start();
+//    qDebug()<<"QIUW::";
+
+    /*std::deque<std::vector<cv::Mat>> deque_raw;
     std::deque<std::vector<cv::Mat>> deque_shifted;
     std::deque<int> deque_frame_tag;
     mcw_->getDeque(deque_raw,deque_shifted,deque_frame_tag);
-
-    if(deque_raw.empty() || deque_shifted.empty()||deque_frame_tag.empty()) return;
-
     if(last_frame_tag == deque_frame_tag[0]) return;
     else last_frame_tag = deque_frame_tag[0];
+    if(deque_raw.empty() || deque_shifted.empty()||deque_frame_tag.empty()) return;*/
 
-    std::vector<cv::Mat> raw = deque_raw[0];
-    std::vector<cv::Mat> shifted = deque_shifted[0];
 
-    if(deque_raw.empty()){
-        qDebug()<<"QIUW::deque empty";
+    std::vector<cv::Mat> raw_frame;
+    std::vector<cv::Mat> shifted_frame;
+    int processed_frame_tag;
+    mcw_->getMeans(raw_frame,shifted_frame,processed_frame_tag);
+
+    if(raw_frame.empty()||shifted_frame.empty()){
+        qDebug()<<"QIUW::average empty";
         return;
     }
-    int n=std::min(n_,(int)deque_raw.size());
-    qDebug()<<"QIUW::averaging " << n_ << ", " << deque_raw.size() << ", " << N_DEQUE;
-    qDebug()<<"QIUW::averaging " << n << " frames";
+    if(processed_frame_tag==last_frame_tag) return;
+    last_frame_tag = processed_frame_tag;
 
-    struct remapped_average_c{
-        inline unsigned int remap_to_uint8(double x, std::vector<int> params){
+    struct remap_c{
+        inline unsigned int remap_to_uint8(double x, std::vector<int>& params){
             return params.size()>2&&params[2]?cv::saturate_cast<unsigned char>(256.0*(x-params[0])/(params[1]-params[0])):0;
         }
-        std::vector<cv::Mat> average;
-        QImage operator ()(std::deque<std::vector<cv::Mat>> &deq, int n, std::vector<std::vector<int>>& channel_parameters){
-            average.resize(deq[0].size());
-            for(int ch=0;ch<deq[0].size();ch++){
-                average[ch]=deq[0][ch];
-                for(int i=1;i<n;i++) average[ch]+=deq[i][ch];
-                average[ch]/=(float)n;
-            }
-            QImage qimg(average[0].cols,average[0].rows,QImage::Format_RGB32);
-            for(int y=0;y<average[0].rows;y++){
-                for(int x=0;x<average[0].cols;x++){
-                    qimg.setPixel(y,x,
-                       qRgb(average.size()==1||channel_parameters[1][2]==0?0:remap_to_uint8(average[1].at<float>(y,x),channel_parameters[1]),
-                            remap_to_uint8(average[0].at<float>(y,x),channel_parameters[0]),
-                            0));
+        QImage operator ()(std::vector<cv::Mat> &frame, std::vector<std::vector<int>>& channel_parameters){
+            QImage qimg(frame[0].cols,frame[0].rows,QImage::Format_RGB32);
+            qDebug()<<frame[0].depth();
+            if(frame[0].depth()==5){
+                for(int y=0;y<frame[0].rows;y++){
+                    for(int x=0;x<frame[0].cols;x++){
+                        qimg.setPixel(y,x,
+                           qRgb(frame.size()==1||channel_parameters[1][2]==0?0:remap_to_uint8(frame[1].at<float>(y,x),channel_parameters[1]),
+                                remap_to_uint8(frame[0].at<float>(y,x),channel_parameters[0]),
+                                0));
+                    }
+                }
+            }else{
+                for(int y=0;y<frame[0].rows;y++){
+                    for(int x=0;x<frame[0].cols;x++){
+                        qimg.setPixel(y,x,
+                           qRgb(frame.size()==1||channel_parameters[1][2]==0?0:remap_to_uint8(frame[1].at<int16_t>(y,x),channel_parameters[1]),
+                                remap_to_uint8(frame[0].at<int16_t>(y,x),channel_parameters[0]),
+                                0));
+                    }
                 }
             }
+
             return qimg;
         }
-    } remapped_average;
+    } remap;
 
-    QImage qimg_raw = remapped_average(deque_raw, n, channel_parameters);
-    QImage qimg_shifted = remapped_average(deque_shifted, n, channel_parameters);
-#ifdef DEBUG
-    qDebug()<<"QIUW::shifted:"<<et.elapsed();
-#endif
+    QImage qimg_raw = remap(raw_frame, channel_parameters);
+    QImage qimg_shifted = remap(shifted_frame, channel_parameters);
+//    qDebug()<<"QIUW::shifted:"<<et.elapsed();
     emit updated(qimg_raw,qimg_shifted);
     qDebug()<<"QIUW::done";
 }
@@ -246,6 +242,9 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(motion_correction_thread, SIGNAL(started()), mcw, SLOT(start()));
     connect(motion_correction_thread, SIGNAL(finished()), mcw, SLOT(deleteLater()));
     connect(motion_correction_thread, SIGNAL(finished()), motion_correction_thread, SLOT(deleteLater()));
+    MotionCorrectionWorker* mcw_ = mcw;  // necessary for closure
+    connect(ui->comboBoxAverage,&QComboBox::currentTextChanged,[mcw_](QString value){mcw_->setNumAverage(value.toInt());});
+    mcw_->setNumAverage(ui->comboBoxAverage->currentText().toInt());
 
     qimage_update_thread=new QThread(this);
     qiuw=new QImageUpdateWorker(NULL, mcw);
@@ -272,8 +271,6 @@ MainWindow::MainWindow(QWidget *parent) :
     //qRegisterMetaType<std::vector<cv::Mat>>();
     connect(mcw,SIGNAL(processed()),qiuw,SLOT(show()));
     connect(qiuw,SIGNAL(updated(QImage,QImage)),this,SLOT(updated(QImage,QImage)));
-    connect(ui->comboBoxAverage,&QComboBox::currentTextChanged,[qiuw_](QString value){qiuw_->setNumAverage(value.toInt());});
-    qiuw->setNumAverage(ui->comboBoxAverage->currentText().toInt());
 
     motion_correction_thread->start();
     qimage_update_thread->start();

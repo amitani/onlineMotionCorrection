@@ -9,6 +9,7 @@
 #include <memory>
 #include "mmap.h"
 #include "image_registrator.h"
+#include "movingaverage.h"
 
 Q_DECLARE_METATYPE(cv::Mat)
 
@@ -27,12 +28,13 @@ public slots:
     void check();
     void setParameters(double factor, int margin, double sigma_smoothing,
                        double sigma_normalization, double normalization_offset, int to_equalize_histogram);
+    void setNumAverage(int n);
 
 public:
     void setTemplate(QString tifffilename);
     void setCh(int ch);
     void initImageRegistrator();
-    void getDeque(std::deque<std::vector<cv::Mat>> &deque_raw, std::deque<std::vector<cv::Mat>> &deque_shifted, std::deque<int> &deque_frame_tag);
+    void getMeans(std::vector<cv::Mat> &raw_frame, std::vector<cv::Mat> &shifted_frame, int &last_frame_tag);
 
 signals:
     void processed();
@@ -48,13 +50,24 @@ private:
     std::shared_ptr<ImageRegistrator> ir;
     std::shared_ptr<SI4Image> temporary_data;
 
+    static void SetMatInMMap(std::shared_ptr<MMap<SI4Image>> mmap, std::vector<cv::Mat> mat, int frame_tag);
+
+/*
     static const int max_deque_size = 200;
     static const int default_n_template = 30;
     int n_template;
-
     std::deque<std::vector<cv::Mat>> deque_raw_;
     std::deque<std::vector<cv::Mat>> deque_shifted_;
     std::deque<int> deque_frame_tag_;
+*/
+    static const int n_for_xyz_correction = 200;
+    static const int n_for_template = 50;
+
+    MovingAverage raw;
+    MovingAverage shifted;
+    MovingAverage tmpl; //template
+    MovingAverage xyz; // for xyz correction
+
     QMutex mutex_;
 
     //cv::Mat shift(SI4Image* source, double i0, double j0);

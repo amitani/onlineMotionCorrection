@@ -27,7 +27,7 @@ struct SI4Image {
     unsigned int n_ch;
     static const unsigned int max_size = 1024 * 1024 * 3;
     int16_t data[max_size];
-};
+}; // 6+MB. Use dynamic allocation in heap, otherwise stack overflows.
 
 template<class T>
 class MMap {
