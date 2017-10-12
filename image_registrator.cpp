@@ -48,8 +48,7 @@ bool ImageRegistrator::LoadParameters(const cv::String xml_filename, bool to_loa
 		fs["SigmaSmoothing"] >> sigma_smoothing_;
 		fs["SigmaNormalization"] >> sigma_normalization_;
 		fs["NormalizationOffset"] >> normalization_offset_;
-		fs["ToEqualizeHistogram"] >> to_equalize_histogram_;
-		fs["Margin"] >> sigma_smoothing_;
+        fs["ToEqualizeHistogram"] >> to_equalize_histogram_;
 		if (to_load_template) fs["Template"] >> original_template_;
 		return true;
 	}catch (cv::Exception e) {

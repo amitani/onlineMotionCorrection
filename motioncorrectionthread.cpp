@@ -151,10 +151,11 @@ void MotionCorrectionWorker::getMeans(std::vector<cv::Mat> &raw_frame, std::vect
 }
 
 void MotionCorrectionWorker::setTemplate(QString tifffilename){
-    template_image = cv::imread(tifffilename.toStdString(),CV_LOAD_IMAGE_ANYDEPTH);
+    template_image = cv::imread(tifffilename.toStdString(),CV_LOAD_IMAGE_ANYDEPTH).t();
     cv::Mat tmp;
-    //template_image.convertTo(tmp,CV_8U);
-    //cv::imshow(tifffilename.toStdString(),tmp);
+    template_image.convertTo(tmp,CV_8U);
+    tmp=tmp.t();
+    cv::imshow(tifffilename.toStdString(),tmp);
 }
 
 void MotionCorrectionWorker::setCh(int ch){
