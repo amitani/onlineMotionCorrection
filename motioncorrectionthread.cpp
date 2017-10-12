@@ -30,7 +30,7 @@ void SetMatInMMap(std::shared_ptr<MMap<SI4Image>> mmap, std::vector<cv::Mat> mat
     return;
 }
 
-MotionCorrectionWorker::MotionCorrectionWorker(QObject* parent):QObject(parent), xyz(n_for_xyz_correction), tmpl(n_for_template)
+MotionCorrectionWorker::MotionCorrectionWorker(QObject* parent):QObject(parent), xyz(n_for_xyz_correction),summed(n_for_summed), tmpl(n_for_template)
 {
     timer = new QTimer(this);
     timer->setInterval(10);
@@ -40,6 +40,7 @@ MotionCorrectionWorker::MotionCorrectionWorker(QObject* parent):QObject(parent),
     mmap_raw=std::make_shared<MMap<SI4Image>>("SI4_RAW");
     mmap_shifted=std::make_shared<MMap<SI4Image>>("MC_SHIFTED");
     mmap_average=std::make_shared<MMap<SI4Image>>("MC_AVERAGE");
+    mmap_summed=std::make_shared<MMap<SI4Image>>("MC_SUMMED");
     mmap_dislocation=std::make_shared<MMap<SmallDoubleMatrix>>("MC_DISLOCATION");
     qDebug()<<"MCW::Constructed";
     temporary_data=std::make_shared<SI4Image>();
@@ -126,9 +127,12 @@ void MotionCorrectionWorker::check(){
                 tmpl.add(std::vector<cv::Mat>(raw_frame.begin()+ch_to_align,raw_frame.begin()+ch_to_align+1),last_frame_tag);
             xyz.add(shifted_frame,last_frame_tag);
             auto mean_for_xyz = xyz.mean();
+            summed.add(shifted_frame,last_frame_tag);
+            auto mean_for_summed = summed.mean();
             mutex_.unlock();
             emit processed();
             SetMatInMMap(mmap_average,mean_for_xyz,last_frame_tag);
+            SetMatInMMap(mmap_summed,mean_for_summed,last_frame_tag);
 
 //            qDebug()<<"MCW::"<<et.elapsed()<<":emitted";
         }else{

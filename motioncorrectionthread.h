@@ -46,6 +46,7 @@ private:
     std::shared_ptr<MMap<SI4Image>> mmap_raw;
     std::shared_ptr<MMap<SI4Image>> mmap_shifted;
     std::shared_ptr<MMap<SI4Image>> mmap_average;
+    std::shared_ptr<MMap<SI4Image>> mmap_summed;
     std::shared_ptr<MMap<SmallDoubleMatrix>> mmap_dislocation;
     cv::Mat template_image;
     int ch;
@@ -63,11 +64,13 @@ private:
 */
     static const int n_for_xyz_correction = 200;
     static const int n_for_template = 50;
+    static const int n_for_summed = 50;
 
     MovingAverage raw;
     MovingAverage shifted;
     MovingAverage tmpl; //template
     MovingAverage xyz; // for xyz correction
+    MovingAverage summed; // for xyz correction
 
     QMutex mutex_;
 

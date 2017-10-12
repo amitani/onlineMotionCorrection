@@ -19,6 +19,7 @@
 #include "qteditorfactory.h"
 #include "qttreepropertybrowser.h"
 
+#include "movingaverage.h"
 
 #include <QImage>
 class QImageUpdateWorker:public QObject
@@ -43,7 +44,6 @@ private:
     int last_frame_tag;
     QTimer* timer;
 };
-
 
 namespace Ui {
 class MainWindow;
