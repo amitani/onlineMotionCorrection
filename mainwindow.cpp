@@ -165,7 +165,7 @@ MainWindow::MainWindow(QWidget *parent) :
         property=intManager[i]->addProperty("Margin");
         intProperties[i].push_back(property);
         intManager[i]->setRange(property,0,128);
-        intManager[i]->setValue(property,64);
+        intManager[i]->setValue(property,32);
         propertyBrowser[i]->addProperty(property);
         property=intManager[i]->addProperty("S_smooth");
         intProperties[i].push_back(property);
