@@ -28,8 +28,8 @@ public slots:
     void start();
     void stop();
     void check();
-    void setParameters(double factor, int margin, double sigma_smoothing,
-                       double sigma_normalization, double normalization_offset, int to_equalize_histogram);
+    void setParameters(double factor, int margin_h, int margin_w, double sigma_smoothing,
+                       double sigma_normalization, double normalization_offset, int threshold, int replacement);
     void setNumAverage(int n);
 
 public:
@@ -74,6 +74,8 @@ private:
 
     QMutex mutex_;
 
+    int threshold_ = 80;
+    int replacement_ = 35;
     //cv::Mat shift(SI4Image* source, double i0, double j0);
 };
 

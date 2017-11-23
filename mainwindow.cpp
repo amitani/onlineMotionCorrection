@@ -162,7 +162,12 @@ MainWindow::MainWindow(QWidget *parent) :
         intManager[i]->setRange(property,0,64);
         intManager[i]->setValue(property,2);
         propertyBrowser[i]->addProperty(property);
-        property=intManager[i]->addProperty("Margin");
+        property=intManager[i]->addProperty("MarginH");
+        intProperties[i].push_back(property);
+        intManager[i]->setRange(property,0,128);
+        intManager[i]->setValue(property,64);
+        propertyBrowser[i]->addProperty(property);
+        property=intManager[i]->addProperty("MarginW");
         intProperties[i].push_back(property);
         intManager[i]->setRange(property,0,128);
         intManager[i]->setValue(property,32);
@@ -182,10 +187,15 @@ MainWindow::MainWindow(QWidget *parent) :
         intManager[i]->setRange(property,-8192,8192);
         intManager[i]->setValue(property,0);
         propertyBrowser[i]->addProperty(property);
-        property=intManager[i]->addProperty("Histgram equal");
+        property=intManager[i]->addProperty("Threshold");
         intProperties[i].push_back(property);
-        intManager[i]->setRange(property,0,1);
-        intManager[i]->setValue(property,0);
+        intManager[i]->setRange(property,-8192,8192);
+        intManager[i]->setValue(property,80);
+        propertyBrowser[i]->addProperty(property);
+        property=intManager[i]->addProperty("Replacement");
+        intProperties[i].push_back(property);
+        intManager[i]->setRange(property,-8192,8192);
+        intManager[i]->setValue(property,35);
         propertyBrowser[i]->addProperty(property);
         propertyBrowser[i]->setResizeMode(propertyBrowser[i]->Stretch);
     }
@@ -277,8 +287,8 @@ MainWindow::MainWindow(QWidget *parent) :
     qDebug()<<"Started thread";
 
     connect(ui->pushButton,SIGNAL(clicked()),this, SLOT(updateParameters()));
-    connect(this,SIGNAL(parametersUpdated(double,int,double,double,double,int)),
-            mcw,SLOT(setParameters(double,int,double,double,double,int)));
+    connect(this,SIGNAL(parametersUpdated(double,int,int,double,double,double,int,int)),
+            mcw,SLOT(setParameters(double,int,int,double,double,double,int,int)));
     updateParameters();
 }
 void MainWindow::updated(QImage qimg_raw, QImage qimg_shifted){
@@ -296,12 +306,12 @@ void MainWindow::updated(QImage qimg_raw, QImage qimg_shifted){
 }
 
 void MainWindow::updateParameters(){
-    int val[6];
+    int val[8];
     for(int j=0;j<intManager[0]->properties().size();j++){
         val[j]=intManager[0]->value(intProperties[0][j]);
         intManager[1]->setValue(intProperties[1][j],val[j]);
     }
-    emit parametersUpdated(val[0],val[1],val[2],val[3],val[4],val[5]);
+    emit parametersUpdated(val[0],val[1],val[2],val[3],val[4],val[5],val[6],val[7]);
     if(!logFileName.empty()){
         auto t = std::time(nullptr);
         auto tm = *std::localtime(&t);
@@ -310,7 +320,7 @@ void MainWindow::updateParameters(){
             try{
                 std::ofstream outfile(logFileName,std::ios_base::app);
                 outfile<<std::put_time(&tm, "\"%Y/%m/%d_%H:%M:%S\"");
-                for(int i=0;i<6;i++) outfile << ", " << val[i];
+                for(int i=0;i<8;i++) outfile << ", " << val[i];
                 outfile << std::endl;
                 done=true;
             }catch(std::exception &e){

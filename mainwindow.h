@@ -65,8 +65,8 @@ public slots:
     void updateParameters();
 
 signals:
-    void parametersUpdated(double factor, int margin, double sigma_smoothing, double sigma_normalization,
-                            double normalization_offset, int to_equalize_histogram);
+    void parametersUpdated(double factor, int margin_h, int margin_w, double sigma_smoothing, double sigma_normalization,
+                            double normalization_offset, int threshold, int replacement);
 
 private:
     Ui::MainWindow *ui;

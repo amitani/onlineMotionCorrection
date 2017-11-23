@@ -70,7 +70,7 @@ void MotionCorrectionWorker::check(){
             qDebug()<<"MCW::"<<temporary_data->frame_tag;
             std::vector<cv::Mat> raw_frame;
             for(int i=0;i<temporary_data->height*temporary_data->width*temporary_data->n_ch;i++){
-                if(temporary_data->data[i]<80)temporary_data->data[i]=35;
+                if(temporary_data->data[i]<threshold_)temporary_data->data[i]=replacement_;
             }
             for(int i=0;i<temporary_data->n_ch;i++){
                 cv::Mat tmp;
@@ -178,9 +178,11 @@ void MotionCorrectionWorker::initImageRegistrator(){
     }
 }
 
-void MotionCorrectionWorker::setParameters(double factor, int margin, double sigma_smoothing,
-                                           double sigma_normalization, double normalization_offset, int to_equalize_histogram){
-    ir->SetParameters(factor,margin,sigma_smoothing,sigma_normalization,normalization_offset,to_equalize_histogram);
+void MotionCorrectionWorker::setParameters(double factor, int margin_h,int margin_w, double sigma_smoothing,
+                                           double sigma_normalization, double normalization_offset, int threshold, int replacement){
+    ir->SetParameters(factor,margin_h,margin_w,sigma_smoothing,sigma_normalization,normalization_offset);
+    threshold_ = threshold;
+    replacement_ = replacement;
     if(!template_image.empty()){
         ir->Init();
     }

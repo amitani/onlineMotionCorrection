@@ -13,8 +13,9 @@ bool ImageRegistrator::Init()
 {
 	Mat tmp;
 	Preprocess(original_template_, tmp);
-	processed_template_center_ = tmp(Range(margin_ / factor_, original_template_.rows / factor_ - margin_ / factor_),
-                                     Range(margin_ / factor_, original_template_.cols / factor_ - margin_ / factor_)).clone();
+    processed_template_center_ = tmp(Range(margin_w_ / factor_, original_template_.rows / factor_ - margin_w_ / factor_),
+                                     Range(margin_h_ / factor_, original_template_.cols / factor_ - margin_h_ / factor_)).clone();
+    // flipped because Matlab uses different data order h and w corresponds to col and row, respectively.
 	return initialized_ = true;
 }
 
@@ -25,16 +26,16 @@ void ImageRegistrator::SetTemplate(const cv::Mat & template_mat)
     return;
 }
 
-void ImageRegistrator::SetParameters(double factor, int margin, double sigma_smoothing,
-	double sigma_normalization, double normalization_offset, int to_equalize_histogram)
+void ImageRegistrator::SetParameters(double factor, int margin_h, int margin_w, double sigma_smoothing,
+    double sigma_normalization, double normalization_offset)
 {
 	initialized_ = false;
-	if(factor>=0) factor_ = factor;
-	if (margin >= 0) margin_ = margin;
+    if(factor>=0) factor_ = factor;
+    if (margin_h >= 0) margin_h_ = margin_h;
+    if (margin_w >= 0) margin_w_ = margin_w;
 	if (sigma_smoothing >= 0) sigma_smoothing_ = sigma_smoothing;
 	if (sigma_normalization >= 0) sigma_normalization_ = sigma_normalization;
-	if (normalization_offset >= 0) normalization_offset_ = normalization_offset;
-	if (to_equalize_histogram >= 0) to_equalize_histogram_ = to_equalize_histogram;
+    if (normalization_offset >= 0) normalization_offset_ = normalization_offset;
 	return;
 }
 
@@ -43,12 +44,12 @@ bool ImageRegistrator::LoadParameters(const cv::String xml_filename, bool to_loa
 	initialized_ = false;
 	try {
 		FileStorage fs(xml_filename, FileStorage::READ);
-		fs["Factor"] >> factor_;
-		fs["Margin"] >> margin_;
+        fs["Factor"] >> factor_;
+        fs["MarginH"] >> margin_h_;
+        fs["MarginW"] >> margin_w_;
 		fs["SigmaSmoothing"] >> sigma_smoothing_;
 		fs["SigmaNormalization"] >> sigma_normalization_;
-		fs["NormalizationOffset"] >> normalization_offset_;
-        fs["ToEqualizeHistogram"] >> to_equalize_histogram_;
+        fs["NormalizationOffset"] >> normalization_offset_;
 		if (to_load_template) fs["Template"] >> original_template_;
 		return true;
 	}catch (cv::Exception e) {
@@ -62,12 +63,12 @@ bool ImageRegistrator::SaveParameters(const String xml_filename, bool to_save_te
 	try {
 		FileStorage fs(xml_filename, FileStorage::WRITE);
 		fs << "Version" << ver_;
-		fs << "Factor" << factor_;
-		fs << "Margin" << margin_;
+        fs << "Factor" << factor_;
+        fs << "MarginH" << margin_h_;
+        fs << "MarginW" << margin_w_;
 		fs << "SigmaSmoothing" << sigma_smoothing_;
 		fs << "SigmaNormalization" << sigma_normalization_;
-		fs << "NormalizationOffset" << normalization_offset_;
-		fs << "ToEqualizeHistogram" << to_equalize_histogram_;
+        fs << "NormalizationOffset" << normalization_offset_;
 		if (to_save_template) fs << "Template" << original_template_;
 		fs.release();
 		return true;
@@ -80,7 +81,7 @@ bool ImageRegistrator::Align(const Mat &in, Mat *out, Point2d *d, Mat *heatmap) 
 	if (!initialized_) return false;
 	Mat tmp;
 	Preprocess(in, tmp);
-    Mat result(2 * std::round(margin_ / factor_) + 1, 2 * std::round(margin_ / factor_) + 1, CV_32FC1);
+    Mat result(2 * std::round(margin_w_ / factor_) + 1, 2 * std::round(margin_h_ / factor_) + 1, CV_32FC1);
 	matchTemplate(tmp, processed_template_center_, result, CV_TM_CCOEFF_NORMED);
 	if (heatmap) {
 		*heatmap = result;
@@ -91,8 +92,8 @@ bool ImageRegistrator::Align(const Mat &in, Mat *out, Point2d *d, Mat *heatmap) 
 	Point2d maxLocSubPix;
 	minMaxLocSubPix(&maxLocSubPix, result, &maxLoc);
 	if (d || out) {
-		d->x = maxLocSubPix.x * factor_ - margin_;
-		d->y = maxLocSubPix.y * factor_ - margin_;
+        d->x = maxLocSubPix.x * factor_ - margin_h_;
+        d->y = maxLocSubPix.y * factor_ - margin_w_;
 	}
 	if (out) {
 		Point2d center;
