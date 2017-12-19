@@ -2,13 +2,6 @@
 #include <QtDebug>
 //#include <QElapsedTimer>
 
-/*
-#define cimg_use_tiff
-#include "CImg.h"
-//#pragma comment(lib, "libtiff.lib")
-using namespace cimg_library;
-*/
-
 void SetMatInMMap(std::shared_ptr<MMap<SI4Image>> mmap, std::vector<cv::Mat> mat, int frame_tag){
     static std::shared_ptr<SI4Image> si = std::make_shared<SI4Image>();
     if(mat.empty()) return;
@@ -117,7 +110,7 @@ void MotionCorrectionWorker::check(){
 //            qDebug()<<"MCW::"<<et.elapsed()<<":shifted";
 
             SmallDoubleMatrix sdm;
-            sdm.height=2;sdm.width=1;sdm.data[0]=d.y;sdm.data[1]=d.x;
+            sdm.height=3;sdm.width=1;sdm.data[0]=d.y;sdm.data[1]=d.x;sdm.data[2]=last_frame_tag;
             mmap_dislocation->set(sdm);
 
             mutex_.lock();
@@ -125,13 +118,13 @@ void MotionCorrectionWorker::check(){
             shifted.add(shifted_frame,last_frame_tag);
             if(template_image.empty())
                 tmpl.add(std::vector<cv::Mat>(raw_frame.begin()+ch_to_align,raw_frame.begin()+ch_to_align+1),last_frame_tag);
-            xyz.add(shifted_frame,last_frame_tag);
-            auto mean_for_xyz = xyz.mean();
+//            xyz.add(shifted_frame,last_frame_tag);
+//            auto mean_for_xyz = xyz.mean();
             summed.add(shifted_frame,last_frame_tag);
             auto mean_for_summed = summed.mean();
             mutex_.unlock();
             emit processed();
-            SetMatInMMap(mmap_average,mean_for_xyz,last_frame_tag);
+//            SetMatInMMap(mmap_average,mean_for_xyz,last_frame_tag);
             SetMatInMMap(mmap_summed,mean_for_summed,last_frame_tag);
 
 //            qDebug()<<"MCW::"<<et.elapsed()<<":emitted";
